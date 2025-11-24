@@ -1,0 +1,20 @@
+# Federated Learning Client - Jetson Nano
+FROM nvcr.io/nvidia/l4t-pytorch:r35.2.1-pth2.0-py3
+
+WORKDIR /app
+
+# Copy requirements
+COPY requirements.txt .
+
+# Install dependencies
+RUN pip3 install --no-cache-dir flwr==1.11.1 cvxpy clarabel scs ecos \
+    numpy matplotlib pandas tqdm psutil
+
+# Copy application files
+COPY flower_client.py models.py utils.py updateModel.py dists.py ./
+
+# Expose port (if needed)
+EXPOSE 8080
+
+# Run client
+CMD ["python3", "flower_client.py", "--client_id", "0", "--server_address", "host.docker.internal:8080"]

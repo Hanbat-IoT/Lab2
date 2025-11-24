@@ -12,12 +12,12 @@ class Client(object):
     def __repr__(self):
         '''
         ADM
-
+        '''
         self.data_distribution()
         return 'Client #{}: {} samples in labels: {} & data distribution: {}\n'.format(
             self.client_id, len(self.data), set([label for _, label in self.data]), 
             [len(self.number_data[i]) for i in range(10)])
-        '''
+        
         return 'Client #{}: {} samples in labels: {}\n'.format(
             self.client_id, len(self.data), set([label for _, label in self.data]))
     

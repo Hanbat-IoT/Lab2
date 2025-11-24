@@ -1,0 +1,24 @@
+# Federated Learning Dependencies
+# 모든 디바이스(노트북, Jetson Nano, Raspberry Pi)에서 동일한 버전 사용
+
+# Flower Framework
+flwr==1.11.1
+
+# PyTorch (CPU 버전 - 호환성 우선)
+torch==2.1.0
+torchvision==0.16.0
+
+# Optimization
+cvxpy==1.4.2
+clarabel==0.7.1
+scs==3.2.4
+ecos==2.0.12
+
+# Utilities
+numpy==1.24.3
+matplotlib==3.8.2
+pandas==2.1.4
+
+# Additional
+tqdm==4.66.1
+psutil==5.9.6

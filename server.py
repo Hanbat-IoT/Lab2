@@ -67,7 +67,7 @@ class Server(object):
                     new_client.set_shard(shard)
                 elif self.config.loader == "bias":
                     dist = dists.uniform(num_clients, len(labels))
-                    self.bias = 0.8 # 0.8
+                    self.bias = 0.5 # 0.8
                     pref = random.choices(labels, weights=dist)[0]
 
                     new_client.set_bias(pref, self.bias)
@@ -161,8 +161,8 @@ class Server(object):
         self.configuration(sample_clients)
         self.adm_configuration(sample_clients)
         
-        '''
-        ADM Algorithm 1
+        
+        # ADM Algorithm 1
         self.optimal_v_n, sol_list, optimal_t = block_coordinate_descent(self.parameters,
                                                                     curr_round,
                                                                     self.parameters["t"]) # sol_list는 objective function 값
@@ -180,7 +180,7 @@ class Server(object):
                 # client.pt_data_distribution(self.file_logger)
             client.train()
         # logging.info("D_n: {}".format(self.parameters["D_n"]))
-        '''
+        
 
         for client in sample_clients:
             client.train()
@@ -214,20 +214,28 @@ class Server(object):
     
     def adm_configuration(self, sample_clients):
         curr_number_sample = []
-        number_sample_list=[1000 for _ in range(10)]
-        number_sample_list.extend([3000 for _ in range(10)])
+        # number_sample_list=[1000 for _ in range(10)]
+        # number_sample_list.extend([3000 for _ in range(10)])
         for client in sample_clients:
             curr_number_sample.append(len(client.data))
-        constant_parameters = {'sigma' : 0.9, 'D_n': number_sample_list, 'Gamma': 0.4, 'local_iter': 10, 'c_n': 30,
-                #   'frequency_n_GHz' : [1.5, 2, 2.5, 3], 
-                  'frequency_n_GHz' : [3000], 
-                  'weight_size_n_kbit' : 100,
-                  'number_of_clients' : self.config.num_clients, 'bandwidth_MHz' : 1, 'channel_gain_n': 1, 
-                #   'transmission_power_n' : [0.2, 0.5, 1], 
-                  'transmission_power_n' : [1], 
-                  'noise_W' : 1e-12,
-                #   't':500}
-                  't':300} # non-iid 섞어서 할때
+        constant_parameters = {
+            'sigma': 0.9 * 1e-8,  # Discounting factor (논문 값)
+            'D_n': [2500 for _ in range(self.config.num_clients)],
+            'Gamma': 0.4,  # 논문 값으로 수정 (기존 0.1 -> 0.4)
+            'local_iter': 10,
+            'c_n': 30,  # CPU cycles per sample (논문 값)
+            # Heterogeneous environment: different computation capacities
+            'frequency_n_GHz' : [1.5, 2.0, 2.5, 3.0],  # 이질적 환경
+            'weight_size_n_kbit' : 100,
+            'number_of_clients': self.config.num_clients,
+            'bandwidth_MHz': 10,  # 10 MHz로 증가 (comm time 감소)
+            'channel_gain_n': 1,
+            # Heterogeneous environment: different transmission powers
+            'transmission_power_n' : [0.5, 1.0],  # 이질적 환경
+            'noise_W': 10**(-114/10) * 1e-3,  # -114 dBm (논문 값)
+            # 't':500}
+            't': 0.006  # 6ms time constraint (comm_time 고려)
+            }
         
         self.parameters=init_param_hetero(constant_parameters, self.config.num_clients, constant_parameters["t"])
         # logging.info("D_n: {}".format(curr_number_sample))
