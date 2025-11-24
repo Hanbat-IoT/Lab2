@@ -1,10 +1,10 @@
 # Federated Learning Dependencies
-# 모든 디바이스(노트북, Jetson Nano, Raspberry Pi)에서 동일한 버전 사용
+# For all devices: Laptop, Jetson Nano, Raspberry Pi
 
 # Flower Framework
 flwr==1.11.1
 
-# PyTorch (CPU 버전 - 호환성 우선)
+# PyTorch (CPU version for compatibility)
 torch==2.1.0
 torchvision==0.16.0
 
