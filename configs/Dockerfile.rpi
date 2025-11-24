@@ -13,10 +13,11 @@ RUN apt-get update && apt-get install -y \
 
 # Install dependencies directly without requirements.txt
 RUN pip3 install --upgrade pip && \
+    pip3 install --no-cache-dir "numpy<2.0" && \
     pip3 install --no-cache-dir flwr>=1.5.0 && \
     pip3 install --no-cache-dir torch==2.1.0 torchvision==0.16.0 --index-url https://download.pytorch.org/whl/cpu && \
     pip3 install --no-cache-dir cvxpy clarabel scs ecos && \
-    pip3 install --no-cache-dir numpy matplotlib pandas tqdm psutil
+    pip3 install --no-cache-dir matplotlib pandas tqdm psutil
 
 # Copy application files (from root context)
 COPY flower_client.py models.py utils.py updateModel.py dists.py ./
