@@ -18,6 +18,8 @@ from collections import OrderedDict
 from models import get_model
 from ADM import init_param_hetero, block_coordinate_descent
 import time
+import utils
+import updateModel
 
 # Setup logging
 logging.basicConfig(
@@ -168,8 +170,41 @@ class FedAvgADMStrategy(FedAvg):
         aggregated_params, metrics = super().aggregate_fit(
             rnd, results, failures
         )
+        
+        # Manually evaluate on server (Flower 0.18.0 workaround)
+        if aggregated_params:
+            accuracy = self._evaluate_global_model(aggregated_params)
+            self.accuracies.append(accuracy)
+            
+            logging.info(f"\n{'='*60}")
+            logging.info(f"Round {rnd} - Global Accuracy: {100 * accuracy:.2f}%")
+            logging.info(f"{'='*60}\n")
 
         return aggregated_params, metrics
+    
+    def _evaluate_global_model(self, parameters):
+        """Evaluate global model on test set"""
+        import utils
+        import updateModel
+        
+        # Load test data
+        generator = utils.get_data(self.dataset)
+        generator.load_data()
+        testset = generator.testset
+        
+        # Load parameters into model
+        weights = fl.common.parameters_to_weights(parameters)
+        model = get_model(self.dataset)
+        
+        params_dict = zip(model.state_dict().keys(), weights)
+        state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
+        model.load_state_dict(state_dict, strict=True)
+        
+        # Evaluate
+        testloader = updateModel.get_testloader(testset, batch_size=1000)
+        accuracy = updateModel.test(model, testloader)
+        
+        return accuracy
 
     def aggregate_evaluate(
         self,
@@ -198,18 +233,24 @@ class FedAvgADMStrategy(FedAvg):
 
     def save_results(self, filename: str):
         """Save experiment results"""
+        # Use v_n_history length as num_rounds if accuracies is empty
+        num_rounds = len(self.accuracies) if self.accuracies else len(self.v_n_history)
+        
         results = {
             "strategy": "FedAvg+ADM",
-            "num_rounds": len(self.accuracies),
+            "num_rounds": num_rounds,
             "accuracies": self.accuracies,
             "v_n_history": self.v_n_history,
-            "adm_params": self.adm_params
+            "adm_params": self.adm_params,
+            "note": "Flower 0.18.0 does not auto-evaluate. Accuracies may be empty."
         }
 
         with open(filename, 'w') as f:
             json.dump(results, f, indent=2)
 
         logging.info(f"Results saved to {filename}")
+        if not self.accuracies:
+            logging.warning("No accuracies recorded. Flower 0.18.0 requires manual evaluation.")
 
 
 class FedAvgBaselineStrategy(FedAvg):
@@ -225,6 +266,54 @@ class FedAvgBaselineStrategy(FedAvg):
         self.accuracies = []
 
         logging.info("Initialized FedAvg Baseline Strategy (no ADM)")
+    
+    def aggregate_fit(
+        self,
+        rnd: int,
+        results: List[Tuple[fl.server.client_proxy.ClientProxy, FitRes]],
+        failures: List[BaseException],
+    ) -> Tuple[Optional[Parameters], Dict[str, Scalar]]:
+        """Aggregate client updates and evaluate (Flower 0.18.0 API)"""
+
+        if not results:
+            return None, {}
+
+        # Call parent's aggregate_fit
+        aggregated_params, metrics = super().aggregate_fit(
+            rnd, results, failures
+        )
+        
+        # Manually evaluate on server
+        if aggregated_params:
+            accuracy = self._evaluate_global_model(aggregated_params)
+            self.accuracies.append(accuracy)
+            
+            logging.info(f"\n{'='*60}")
+            logging.info(f"Round {rnd} - Global Accuracy: {100 * accuracy:.2f}%")
+            logging.info(f"{'='*60}\n")
+
+        return aggregated_params, metrics
+    
+    def _evaluate_global_model(self, parameters):
+        """Evaluate global model on test set"""
+        # Load test data
+        generator = utils.get_data(self.dataset)
+        generator.load_data()
+        testset = generator.testset
+        
+        # Load parameters into model
+        weights = fl.common.parameters_to_weights(parameters)
+        model = get_model(self.dataset)
+        
+        params_dict = zip(model.state_dict().keys(), weights)
+        state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
+        model.load_state_dict(state_dict, strict=True)
+        
+        # Evaluate
+        testloader = updateModel.get_testloader(testset, batch_size=1000)
+        accuracy = updateModel.test(model, testloader)
+        
+        return accuracy
 
     def initialize_parameters(self, client_manager):
         """Initialize global model parameters (Flower 0.18.0 API)"""
@@ -289,14 +378,17 @@ class FedAvgBaselineStrategy(FedAvg):
         """Save experiment results"""
         results = {
             "strategy": "FedAvg (Baseline)",
-            "num_rounds": len(self.accuracies),
-            "accuracies": self.accuracies
+            "num_rounds": self.num_rounds,
+            "accuracies": self.accuracies,
+            "note": "Flower 0.18.0 does not auto-evaluate. Accuracies may be empty."
         }
 
         with open(filename, 'w') as f:
             json.dump(results, f, indent=2)
 
         logging.info(f"Results saved to {filename}")
+        if not self.accuracies:
+            logging.warning("No accuracies recorded. Flower 0.18.0 requires manual evaluation.")
 
 
 def main():
