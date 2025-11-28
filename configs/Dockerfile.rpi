@@ -1,6 +1,6 @@
 # Federated Learning Client - Raspberry Pi
 # ARM64 architecture, CPU only
-# Flower 0.18.0 - Minimal working configuration
+# Flower 0.18.0 - Working configuration without problematic packages
 
 FROM python:3.9-slim-bullseye
 
@@ -37,12 +37,13 @@ RUN pip3 install --no-cache-dir \
 # Install scipy (required for cvxpy)
 RUN pip3 install --no-cache-dir scipy==1.7.3
 
-# Install cvxpy with pre-built wheels (avoid compilation issues)
+# Install ECOS and OSQP solvers (skip SCS - build issues on ARM)
 RUN pip3 install --no-cache-dir \
-    cvxpy==1.2.1 \
     ecos==2.0.10 \
-    osqp==0.6.2 \
-    scs==2.1.4
+    osqp==0.6.2
+
+# Install cvxpy (will use ECOS and OSQP, skip SCS)
+RUN pip3 install --no-cache-dir cvxpy==1.2.1
 
 # Install utilities
 RUN pip3 install --no-cache-dir \
@@ -56,7 +57,7 @@ RUN pip3 install --no-cache-dir \
 RUN python3 -c "import numpy; print('NumPy:', numpy.__version__)" && \
     python3 -c "import torch; print('PyTorch:', torch.__version__)" && \
     python3 -c "import flwr; print('Flower:', flwr.__version__)" && \
-    python3 -c "import cvxpy; print('CVXPY:', cvxpy.__version__)"
+    python3 -c "import cvxpy; print('CVXPY:', cvxpy.__version__); print('Available solvers:', cvxpy.installed_solvers())"
 
 # Copy application files
 COPY flower_client.py models.py utils.py updateModel.py dists.py ./
