@@ -27,7 +27,7 @@ RUN pip3 install --no-cache-dir \
     typing-extensions==4.1.1 \
     dataclasses==0.8 \
     numpy==1.19.5 \
-    flwr==1.4.0 \
+    flwr==0.18.0 \
     cvxpy==1.1.18 \
     scs==2.1.4 \
     ecos==2.0.10 \
