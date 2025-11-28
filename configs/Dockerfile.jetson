@@ -1,9 +1,9 @@
 # Federated Learning Client - Jetson Nano
 # Python 3.6.9 compatible
-# Using l4t-ml which includes full CUDA runtime libraries
-# l4t-ml includes PyTorch 1.10.0, TensorFlow, and complete CUDA toolkit
+# Using l4t-pytorch base image (smaller size than l4t-ml)
+# CUDA libraries will be mounted from host via nvidia-docker runtime
 
-FROM nvcr.io/nvidia/l4t-ml:r32.7.1-py3
+FROM nvcr.io/nvidia/l4t-pytorch:r32.7.1-pth1.10-py3
 
 WORKDIR /app
 
