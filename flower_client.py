@@ -75,7 +75,8 @@ class FlowerClient(fl.client.NumPyClient):
             argparse.Namespace(
                 dataset=self.dataset,
                 num_clients=1,
-                IID=True
+                IID=True,
+                seed=42
             ),
             generator
         )
