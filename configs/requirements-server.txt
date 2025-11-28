@@ -1,0 +1,31 @@
+# Federated Learning Server Dependencies
+# For Laptop/Desktop (Windows/Linux/Mac)
+# Compatible with Flower 0.18.0 clients
+
+# IMPORTANT: Install in this order to avoid build issues on Windows
+
+# Step 1: Install PyTorch first (includes compatible NumPy)
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Step 2: Install Flower with binary wheels (no compilation needed)
+flwr==0.18.0
+
+# Step 3: Install optimization libraries
+scipy>=1.7.0
+cvxpy>=1.2.0
+
+# Step 4: Install utilities
+matplotlib>=3.5.0
+pandas>=1.3.0
+tqdm>=4.60.0
+psutil>=5.9.0
+Pillow>=9.0.0
+
+# Step 5: Flask (for GUI mode)
+flask>=2.3.0
+Werkzeug>=2.3.0
+
+# Note: grpcio, protobuf, ecos, osqp will be installed automatically as dependencies
+# If you get build errors on Windows, install Visual C++ Build Tools:
+# https://visualstudio.microsoft.com/visual-cpp-build-tools/
