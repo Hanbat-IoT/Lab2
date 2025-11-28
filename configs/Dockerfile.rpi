@@ -1,6 +1,6 @@
 # Federated Learning Client - Raspberry Pi
 # ARM64 architecture, CPU only
-# Compatible with Jetson Nano dependencies
+# Flower 0.18.0 compatible versions
 
 FROM python:3.9-slim-bullseye
 
@@ -14,34 +14,47 @@ RUN apt-get update && apt-get install -y \
     libopenblas-dev \
     liblapack-dev \
     gfortran \
+    libatlas-base-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Upgrade pip
-RUN pip3 install --upgrade pip
+# Upgrade pip and setuptools
+RUN pip3 install --upgrade pip==21.3.1 setuptools wheel
 
-# Install NumPy first (ARM optimization)
-RUN pip3 install --no-cache-dir numpy==1.24.3
+# Install NumPy < 2.0 first (Flower 0.18.0 compatible)
+RUN pip3 install --no-cache-dir numpy==1.21.6
 
-# Install PyTorch CPU version
+# Install PyTorch CPU version (compatible with NumPy 1.21.6)
 RUN pip3 install --no-cache-dir \
-    torch==2.0.0 \
-    torchvision==0.15.0 \
+    torch==1.12.1 \
+    torchvision==0.13.1 \
     --index-url https://download.pytorch.org/whl/cpu
 
-# Install Flower and optimization libraries
-# Using stable versions compatible with ARM
+# Install Flower 0.18.0 and its dependencies
 RUN pip3 install --no-cache-dir \
-    flwr==1.11.1 \
-    cvxpy==1.3.2 \
-    scs==3.2.3 \
-    ecos==2.0.12
+    flwr==0.18.0 \
+    grpcio==1.48.0 \
+    protobuf==3.19.4
 
-# Install utilities
+# Install optimization libraries (compatible with NumPy 1.21.6)
 RUN pip3 install --no-cache-dir \
-    matplotlib==3.7.2 \
-    pandas==2.0.3 \
-    tqdm==4.66.1 \
-    psutil==5.9.5
+    cvxpy==1.2.2 \
+    scs==3.2.0 \
+    ecos==2.0.10 \
+    scipy==1.7.3
+
+# Install utilities (compatible with NumPy 1.21.6)
+RUN pip3 install --no-cache-dir \
+    matplotlib==3.5.3 \
+    pandas==1.3.5 \
+    tqdm==4.64.1 \
+    psutil==5.9.0
+
+# Verify installations
+RUN python3 -c "import numpy; print(f'NumPy: {numpy.__version__}')" && \
+    python3 -c "import torch; print(f'PyTorch: {torch.__version__}')" && \
+    python3 -c "import flwr; print(f'Flower: {flwr.__version__}')" && \
+    python3 -c "import cvxpy; print(f'CVXPY: {cvxpy.__version__}')" && \
+    python3 -c "import numpy; assert numpy.__version__ < '2.0.0', 'NumPy >= 2.0 detected!'"
 
 # Copy application files
 COPY flower_client.py models.py utils.py updateModel.py dists.py ./
