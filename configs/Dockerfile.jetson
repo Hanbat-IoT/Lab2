@@ -7,8 +7,9 @@ FROM nvcr.io/nvidia/l4t-pytorch:r32.7.1-pth1.10-py3
 
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
+# Fix GPG key issue and install system dependencies
+RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 16FAAD7AF99A65E2E || true && \
+    apt-get update && apt-get install -y \
     build-essential \
     cmake \
     libopenblas-dev \
