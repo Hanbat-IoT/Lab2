@@ -20,7 +20,7 @@ RUN apt-get update && apt-get install -y \
 RUN pip3 install --upgrade pip==21.3.1 setuptools==59.6.0 wheel --disable-pip-version-check
 
 # Install NumPy (< 2.0 for compatibility)
-RUN pip3 install --no-cache-dir numpy==1.21.6
+RUN pip3 install --no-cache-dir numpy==1.23.5
 
 # Install PyTorch CPU version
 RUN pip3 install --no-cache-dir \
