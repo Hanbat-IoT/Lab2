@@ -95,8 +95,16 @@ class FlowerClient(fl.client.Client):
         return [val.cpu().numpy() for _, val in self.model.state_dict().items()]
 
     def set_parameters(self, parameters):
-        """Set model parameters"""
-        params_dict = zip(self.model.state_dict().keys(), parameters)
+        """Set model parameters (Flower 0.18.0 API)"""
+        # Convert Parameters object to list of numpy arrays
+        if hasattr(parameters, 'tensors'):
+            # Flower 0.18.0: Parameters object has 'tensors' attribute
+            weights = fl.common.parameters_to_weights(parameters)
+        else:
+            # Already a list of numpy arrays
+            weights = parameters
+            
+        params_dict = zip(self.model.state_dict().keys(), weights)
         state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
         self.model.load_state_dict(state_dict, strict=True)
 
@@ -135,8 +143,11 @@ class FlowerClient(fl.client.Client):
         logging.info(f"Training completed in {training_time:.2f}s")
 
         # Return FitRes (Flower 0.18.0 API)
+        # Convert parameters to Parameters object
+        parameters_obj = fl.common.weights_to_parameters(self.get_parameters())
+        
         return fl.common.FitRes(
-            parameters=self.get_parameters(),
+            parameters=parameters_obj,
             num_examples=len(adjusted_data),
             metrics={
                 "client_id": self.client_id,
