@@ -1,12 +1,12 @@
 # Federated Learning Client - Raspberry Pi
 # ARM64 architecture, CPU only
-# Flower 0.18.0 compatible versions
+# Flower 0.18.0 - Minimal working configuration
 
 FROM python:3.9-slim-bullseye
 
 WORKDIR /app
 
-# Install system dependencies for ARM compilation
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
     cmake \
@@ -14,40 +14,37 @@ RUN apt-get update && apt-get install -y \
     libopenblas-dev \
     liblapack-dev \
     gfortran \
-    libatlas-base-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Upgrade pip and setuptools
+# Upgrade pip
 RUN pip3 install --upgrade pip==21.3.1 setuptools==59.6.0 wheel --disable-pip-version-check
 
-# Install NumPy first (Flower 0.18.0 compatible)
+# Install NumPy (< 2.0 for compatibility)
 RUN pip3 install --no-cache-dir numpy==1.21.6
 
-# Install PyTorch CPU version (compatible with NumPy 1.21.6)
+# Install PyTorch CPU version
 RUN pip3 install --no-cache-dir \
     torch==1.12.1 \
     torchvision==0.13.1 \
     --index-url https://download.pytorch.org/whl/cpu
 
-# Install Flower 0.18.0 with exact compatible dependencies
+# Install Flower 0.18.0 and dependencies
 RUN pip3 install --no-cache-dir \
     grpcio==1.43.0 \
     protobuf==3.19.4 \
     flwr==0.18.0
 
-# Install scipy first (required by cvxpy)
+# Install scipy (required for cvxpy)
 RUN pip3 install --no-cache-dir scipy==1.7.3
 
-# Install optimization libraries (compatible with NumPy 1.21.6 and scipy 1.7.3)
+# Install cvxpy with pre-built wheels (avoid compilation issues)
 RUN pip3 install --no-cache-dir \
-    osqp==0.6.2 \
+    cvxpy==1.2.1 \
     ecos==2.0.10 \
-    scs==3.2.0
+    osqp==0.6.2 \
+    scs==2.1.4
 
-# Install cvxpy (after scipy and solvers)
-RUN pip3 install --no-cache-dir cvxpy==1.2.2
-
-# Install utilities (compatible with NumPy 1.21.6)
+# Install utilities
 RUN pip3 install --no-cache-dir \
     matplotlib==3.5.3 \
     pandas==1.3.5 \
@@ -55,13 +52,11 @@ RUN pip3 install --no-cache-dir \
     psutil==5.9.0 \
     Pillow==9.5.0
 
-# Verify installations
-RUN python3 -c "import numpy; print(f'NumPy: {numpy.__version__}')" && \
-    python3 -c "import torch; print(f'PyTorch: {torch.__version__}')" && \
-    python3 -c "import flwr; print(f'Flower: {flwr.__version__}')" && \
-    python3 -c "import cvxpy; print(f'CVXPY: {cvxpy.__version__}')" && \
-    python3 -c "import scipy; print(f'SciPy: {scipy.__version__}')" && \
-    python3 -c "import numpy; assert numpy.__version__ < '2.0.0', 'NumPy >= 2.0 detected!'"
+# Verify critical installations
+RUN python3 -c "import numpy; print('NumPy:', numpy.__version__)" && \
+    python3 -c "import torch; print('PyTorch:', torch.__version__)" && \
+    python3 -c "import flwr; print('Flower:', flwr.__version__)" && \
+    python3 -c "import cvxpy; print('CVXPY:', cvxpy.__version__)"
 
 # Copy application files
 COPY flower_client.py models.py utils.py updateModel.py dists.py ./
@@ -69,5 +64,5 @@ COPY flower_client.py models.py utils.py updateModel.py dists.py ./
 # Expose port
 EXPOSE 8080
 
-# Run client with recommended data size for Raspberry Pi
+# Run client
 CMD ["python3", "flower_client.py", "--client_id", "1", "--server_address", "host.docker.internal:8080", "--data_size", "2000"]
