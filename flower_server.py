@@ -57,23 +57,23 @@ class FedAvgADMStrategy(FedAvg):
         logging.info("Initialized FedAvgADMStrategy with ADM optimization")
 
     def initialize_parameters(self, client_manager):
-        """Initialize global model parameters"""
+        """Initialize global model parameters (Flower 0.18.0 API)"""
         model = get_model(self.dataset)
 
-        # Convert model to parameters
+        # Convert model to parameters (Flower 0.18.0 uses weights_to_parameters)
         params = [val.cpu().numpy() for _, val in model.state_dict().items()]
-        return fl.common.ndarrays_to_parameters(params)
+        return fl.common.weights_to_parameters(params)
 
     def configure_fit(
-        self, server_round: int, parameters: Parameters, client_manager
+        self, rnd: int, parameters: Parameters, client_manager
     ) -> List[Tuple[fl.server.client_proxy.ClientProxy, fl.common.FitIns]]:
         """
-        라운드 시작 시 호출: ADM 최적화 수행 및 클라이언트 설정
+        라운드 시작 시 호출: ADM 최적화 수행 및 클라이언트 설정 (Flower 0.18.0 API)
         """
-        self.current_round = server_round - 1  # 0-indexed
+        self.current_round = rnd - 1  # 0-indexed
 
         logging.info(f"\n{'='*60}")
-        logging.info(f"Round {server_round}/{self.adm_params['rounds']}")
+        logging.info(f"Round {rnd}/{self.adm_params['rounds']}")
         logging.info(f"{'='*60}")
 
         # ADM configuration
@@ -90,7 +90,7 @@ class FedAvgADMStrategy(FedAvg):
         config_list = []
         for idx, client in enumerate(clients):
             config = {
-                "server_round": server_round,
+                "server_round": rnd,
                 "local_epochs": 5,
                 "batch_size": 32,
                 "v_n": float(self.optimal_v_n[idx]),  # ADM optimized value
@@ -142,11 +142,11 @@ class FedAvgADMStrategy(FedAvg):
 
     def aggregate_fit(
         self,
-        server_round: int,
+        rnd: int,
         results: List[Tuple[fl.server.client_proxy.ClientProxy, FitRes]],
         failures: List[BaseException],
     ) -> Tuple[Optional[Parameters], Dict[str, Scalar]]:
-        """Aggregate client updates (FedAvg)"""
+        """Aggregate client updates (FedAvg) - Flower 0.18.0 API"""
 
         if not results:
             return None, {}
@@ -166,18 +166,18 @@ class FedAvgADMStrategy(FedAvg):
 
         # Call parent's aggregate_fit
         aggregated_params, metrics = super().aggregate_fit(
-            server_round, results, failures
+            rnd, results, failures
         )
 
         return aggregated_params, metrics
 
     def aggregate_evaluate(
         self,
-        server_round: int,
+        rnd: int,
         results: List[Tuple[fl.server.client_proxy.ClientProxy, fl.common.EvaluateRes]],
         failures: List[BaseException],
     ) -> Tuple[Optional[float], Dict[str, Scalar]]:
-        """Aggregate evaluation results"""
+        """Aggregate evaluation results (Flower 0.18.0 API)"""
 
         if not results:
             return None, {}
@@ -191,7 +191,7 @@ class FedAvgADMStrategy(FedAvg):
         self.accuracies.append(accuracy)
 
         logging.info(f"\n{'='*60}")
-        logging.info(f"Round {server_round} - Global Accuracy: {100 * accuracy:.2f}%")
+        logging.info(f"Round {rnd} - Global Accuracy: {100 * accuracy:.2f}%")
         logging.info(f"{'='*60}\n")
 
         return accuracy, {"accuracy": accuracy}
@@ -227,18 +227,18 @@ class FedAvgBaselineStrategy(FedAvg):
         logging.info("Initialized FedAvg Baseline Strategy (no ADM)")
 
     def initialize_parameters(self, client_manager):
-        """Initialize global model parameters"""
+        """Initialize global model parameters (Flower 0.18.0 API)"""
         model = get_model(self.dataset)
         params = [val.cpu().numpy() for _, val in model.state_dict().items()]
-        return fl.common.ndarrays_to_parameters(params)
+        return fl.common.weights_to_parameters(params)
 
     def configure_fit(
-        self, server_round: int, parameters: Parameters, client_manager
+        self, rnd: int, parameters: Parameters, client_manager
     ) -> List[Tuple[fl.server.client_proxy.ClientProxy, fl.common.FitIns]]:
-        """Configure clients (all with v_n=1.0)"""
+        """Configure clients (all with v_n=1.0) - Flower 0.18.0 API"""
 
         logging.info(f"\n{'='*60}")
-        logging.info(f"Round {server_round}/{self.num_rounds}")
+        logging.info(f"Round {rnd}/{self.num_rounds}")
         logging.info(f"{'='*60}")
 
         clients = client_manager.sample(
@@ -249,7 +249,7 @@ class FedAvgBaselineStrategy(FedAvg):
         config_list = []
         for idx, client in enumerate(clients):
             config = {
-                "server_round": server_round,
+                "server_round": rnd,
                 "local_epochs": 5,
                 "batch_size": 32,
                 "v_n": 1.0,  # Always use full data
@@ -264,11 +264,11 @@ class FedAvgBaselineStrategy(FedAvg):
 
     def aggregate_evaluate(
         self,
-        server_round: int,
+        rnd: int,
         results: List[Tuple[fl.server.client_proxy.ClientProxy, fl.common.EvaluateRes]],
         failures: List[BaseException],
     ) -> Tuple[Optional[float], Dict[str, Scalar]]:
-        """Aggregate evaluation results"""
+        """Aggregate evaluation results (Flower 0.18.0 API)"""
 
         if not results:
             return None, {}
@@ -280,7 +280,7 @@ class FedAvgBaselineStrategy(FedAvg):
         self.accuracies.append(accuracy)
 
         logging.info(f"\n{'='*60}")
-        logging.info(f"Round {server_round} - Global Accuracy: {100 * accuracy:.2f}%")
+        logging.info(f"Round {rnd} - Global Accuracy: {100 * accuracy:.2f}%")
         logging.info(f"{'='*60}\n")
 
         return accuracy, {"accuracy": accuracy}
@@ -346,14 +346,12 @@ def main():
         'rounds': args.num_rounds
     }
 
-    # Select strategy
+    # Select strategy (Flower 0.18.0 API)
     if args.strategy == 'fedavg_adm':
         strategy = FedAvgADMStrategy(
             num_clients=args.num_clients,
             dataset=args.dataset,
             adm_params=adm_params,
-            min_fit_clients=args.num_clients,
-            min_evaluate_clients=args.num_clients,
             min_available_clients=args.num_clients,
         )
         result_file = f"results_{args.strategy}_{args.num_clients}clients.json"
@@ -362,16 +360,14 @@ def main():
             num_clients=args.num_clients,
             dataset=args.dataset,
             num_rounds=args.num_rounds,
-            min_fit_clients=args.num_clients,
-            min_evaluate_clients=args.num_clients,
             min_available_clients=args.num_clients,
         )
         result_file = f"results_{args.strategy}_{args.num_clients}clients.json"
 
-    # Start server
+    # Start server (Flower 0.18.0 API)
     fl.server.start_server(
         server_address=args.server_address,
-        config=fl.server.ServerConfig(num_rounds=args.num_rounds),
+        config={"num_rounds": args.num_rounds},
         strategy=strategy,
     )
 

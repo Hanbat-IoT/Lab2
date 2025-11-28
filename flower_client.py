@@ -30,9 +30,9 @@ logging.basicConfig(
 )
 
 
-class FlowerClient(fl.client.NumPyClient):
+class FlowerClient(fl.client.Client):
     """
-    Flower Client Implementation
+    Flower Client Implementation (Flower 0.18.0 API)
     ADM의 v_n 파라미터에 따라 데이터 사용량을 조절
     """
 
@@ -90,8 +90,8 @@ class FlowerClient(fl.client.NumPyClient):
 
         logging.info(f"Loaded {len(self.data)} training samples")
 
-    def get_parameters(self, config):
-        """Return model parameters"""
+    def get_parameters(self):
+        """Return model parameters (Flower 0.18.0 API - no config parameter)"""
         return [val.cpu().numpy() for _, val in self.model.state_dict().items()]
 
     def set_parameters(self, parameters):
@@ -100,15 +100,16 @@ class FlowerClient(fl.client.NumPyClient):
         state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
         self.model.load_state_dict(state_dict, strict=True)
 
-    def fit(self, parameters, config):
+    def fit(self, ins):
         """
-        Train model with ADM-adjusted data size
+        Train model with ADM-adjusted data size (Flower 0.18.0 API)
 
-        config contains:
-        - v_n: data usage ratio (from ADM optimization)
-        - local_epochs: number of local training epochs
-        - batch_size: training batch size
+        ins: FitIns object containing parameters and config
         """
+        # Extract parameters and config from FitIns
+        parameters = ins.parameters
+        config = ins.config
+        
         self.set_parameters(parameters)
 
         # Get training config
@@ -133,11 +134,11 @@ class FlowerClient(fl.client.NumPyClient):
 
         logging.info(f"Training completed in {training_time:.2f}s")
 
-        # Return updated parameters
-        return (
-            self.get_parameters(config={}),
-            len(adjusted_data),
-            {
+        # Return FitRes (Flower 0.18.0 API)
+        return fl.common.FitRes(
+            parameters=self.get_parameters(),
+            num_examples=len(adjusted_data),
+            metrics={
                 "client_id": self.client_id,
                 "training_time": training_time,
                 "v_n": v_n,
@@ -214,8 +215,11 @@ class FlowerClient(fl.client.NumPyClient):
             avg_loss = epoch_loss / len(trainloader)
             logging.info(f"  Epoch {epoch+1}/{epochs}, Loss: {avg_loss:.4f}")
 
-    def evaluate(self, parameters, config):
-        """Evaluate the model"""
+    def evaluate(self, ins):
+        """Evaluate the model (Flower 0.18.0 API)"""
+        # Extract parameters from EvaluateIns
+        parameters = ins.parameters
+        
         self.set_parameters(parameters)
 
         testloader = updateModel.get_testloader(self.testset, batch_size=1000)
@@ -223,10 +227,11 @@ class FlowerClient(fl.client.NumPyClient):
 
         logging.info(f"Client {self.client_id} - Test Accuracy: {100*accuracy:.2f}%")
 
-        return (
-            float(0.0),  # loss
-            len(self.testset),
-            {"accuracy": float(accuracy)}
+        # Return EvaluateRes (Flower 0.18.0 API)
+        return fl.common.EvaluateRes(
+            loss=float(0.0),
+            num_examples=len(self.testset),
+            metrics={"accuracy": float(accuracy)}
         )
 
 
@@ -260,7 +265,7 @@ def main():
         data_size=args.data_size
     )
 
-    # Start client
+    # Start client (Flower 0.18.0 API)
     fl.client.start_client(
         server_address=args.server_address,
         client=client,
