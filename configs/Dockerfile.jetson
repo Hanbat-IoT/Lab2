@@ -12,9 +12,11 @@ ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:${LD_LIBRARY_PATH}
 ENV PATH=/usr/local/cuda/bin:${PATH}
 ENV CUDA_HOME=/usr/local/cuda
 
-# Fix GPG key issue and install system dependencies
-# Disable repository signature verification for problematic repos
-RUN echo 'Acquire::AllowInsecureRepositories "true";' > /etc/apt/apt.conf.d/99allow-insecure && \
+# Fix DNS resolution and GPG key issues
+# Set DNS servers for package installation
+RUN echo "nameserver 8.8.8.8" > /etc/resolv.conf && \
+    echo "nameserver 8.8.4.4" >> /etc/resolv.conf && \
+    echo 'Acquire::AllowInsecureRepositories "true";' > /etc/apt/apt.conf.d/99allow-insecure && \
     echo 'Acquire::AllowDowngradeToInsecureRepositories "true";' >> /etc/apt/apt.conf.d/99allow-insecure && \
     apt-get update --allow-insecure-repositories || apt-get update && \
     apt-get install -y --allow-unauthenticated \
