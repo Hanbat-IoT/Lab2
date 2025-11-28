@@ -77,7 +77,7 @@ docker run --runtime nvidia --network host \
 docker run --network host \
   -e CLIENT_ID=1 \
   -e SERVER_ADDRESS=192.168.0.100:8080 \
-  -e DATASET=mnist \
+  -e DATASET=cifar \
   -e DATA_SIZE=2000 \
   fl-client-rpi:latest
 ```
