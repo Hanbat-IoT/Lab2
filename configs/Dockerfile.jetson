@@ -1,9 +1,9 @@
 # Federated Learning Client - Jetson Nano
 # Python 3.6.9 compatible
-# Note: For newer JetPack (5.x), use l4t-pytorch:r35.2.1-pth2.0-py3
-# For older JetPack (4.x), use l4t-pytorch:r32.7.1-pth1.10-py3
+# Using l4t-ml which includes full CUDA runtime libraries
+# l4t-ml includes PyTorch 1.10.0, TensorFlow, and complete CUDA toolkit
 
-FROM nvcr.io/nvidia/l4t-pytorch:r32.7.1-pth1.10-py3
+FROM nvcr.io/nvidia/l4t-ml:r32.7.1-py3
 
 WORKDIR /app
 
