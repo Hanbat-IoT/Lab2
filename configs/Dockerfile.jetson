@@ -1,21 +1,43 @@
 # Federated Learning Client - Jetson Nano
-FROM nvcr.io/nvidia/l4t-pytorch:r35.2.1-pth2.0-py3
+# Python 3.6.9 compatible
+# Note: For newer JetPack (5.x), use l4t-pytorch:r35.2.1-pth2.0-py3
+# For older JetPack (4.x), use l4t-pytorch:r32.7.1-pth1.10-py3
+
+FROM nvcr.io/nvidia/l4t-pytorch:r32.7.1-pth1.10-py3
 
 WORKDIR /app
 
-# Copy requirements
-COPY requirements.txt .
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    libopenblas-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install dependencies
-RUN pip3 install --upgrade pip && \
-    pip3 install --no-cache-dir flwr>=1.5.0 cvxpy clarabel scs ecos \
-    numpy matplotlib pandas tqdm psutil
+# Upgrade pip (compatible with Python 3.6)
+RUN python3 -m pip install --upgrade pip==21.3.1
 
-# Copy application files
-COPY flower_client.py models.py utils.py updateModel.py dists.py ./
+# Install Python 3.6 compatible dependencies
+# PyTorch 1.10.0 is already included in base image
+RUN pip3 install --no-cache-dir \
+    typing-extensions==4.1.1 \
+    dataclasses==0.8 \
+    numpy==1.19.5 \
+    flwr==1.4.0 \
+    cvxpy==1.1.18 \
+    scs==2.1.4 \
+    ecos==2.0.10 \
+    matplotlib==3.3.4 \
+    pandas==1.1.5 \
+    tqdm==4.62.3 \
+    psutil==5.8.0
 
-# Expose port (if needed)
+# Copy application files (Python 3.6 compatible version)
+COPY flower_client_jetson_py36.py flower_client.py
+COPY models.py utils.py updateModel.py dists.py ./
+
+# Expose port
 EXPOSE 8080
 
-# Run client
-CMD ["python3", "flower_client.py", "--client_id", "0", "--server_address", "host.docker.internal:8080"]
+# Run client (using Python 3.6 compatible version)
+CMD ["python3", "flower_client.py", "--client_id", "0", "--server_address", "host.docker.internal:8080", "--data_size", "1500"]

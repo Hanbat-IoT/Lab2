@@ -1,0 +1,27 @@
+# Federated Learning Dependencies for Jetson Nano
+# Python 3.6.9 compatible versions
+
+# Flower Framework (Python 3.6 compatible)
+flwr==1.4.0
+
+# PyTorch - Use NVIDIA pre-installed version
+# JetPack comes with PyTorch 1.10.0 for Python 3.6
+# DO NOT install torch/torchvision via pip
+
+# Optimization (Python 3.6 compatible)
+cvxpy==1.1.18
+scs==2.1.4
+ecos==2.0.10
+
+# Utilities (Python 3.6 compatible)
+numpy==1.19.5
+matplotlib==3.3.4
+pandas==1.1.5
+
+# Additional
+tqdm==4.62.3
+psutil==5.8.0
+
+# Typing extensions for Python 3.6
+typing-extensions==4.1.1
+dataclasses==0.8
