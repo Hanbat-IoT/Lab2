@@ -3,7 +3,10 @@
 
 # Install in this order to avoid build issues
 
-# PyTorch (includes compatible NumPy)
+# NumPy (must be <2.0 for torchvision compatibility)
+numpy=1.23.5
+
+# PyTorch
 torch>=2.0.0
 torchvision>=0.15.0
 

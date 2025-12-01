@@ -28,18 +28,20 @@ def plot_accuracy_comparison(baseline_results, adm_results, save_path='compariso
         print("   Make sure both experiments completed successfully")
         return
 
-    rounds = range(1, len(baseline_acc) + 1)
+    # Handle different lengths by using separate round ranges
+    baseline_rounds = range(1, len(baseline_acc) + 1)
+    adm_rounds = range(1, len(adm_acc) + 1)
 
     plt.figure(figsize=(14, 7))
 
-    # Plot lines
-    plt.plot(rounds, baseline_acc, marker='o', linewidth=2.5, markersize=8,
+    # Plot lines with separate round ranges
+    plt.plot(baseline_rounds, baseline_acc, marker='o', linewidth=2.5, markersize=8,
              label='FedAvg (Baseline)', color='#1f77b4', alpha=0.8)
-    plt.plot(rounds, adm_acc, marker='s', linewidth=2.5, markersize=8,
+    plt.plot(adm_rounds, adm_acc, marker='s', linewidth=2.5, markersize=8,
              label='FedAvg + ADM (Proposed)', color='#ff7f0e', alpha=0.8)
 
     # Add accuracy annotations for each round
-    for i, (r, acc) in enumerate(zip(rounds, baseline_acc)):
+    for i, (r, acc) in enumerate(zip(baseline_rounds, baseline_acc)):
         plt.annotate(f'{acc:.1f}%',
                     xy=(r, acc),
                     xytext=(0, 10),
@@ -49,7 +51,7 @@ def plot_accuracy_comparison(baseline_results, adm_results, save_path='compariso
                     ha='center',
                     fontweight='bold')
     
-    for i, (r, acc) in enumerate(zip(rounds, adm_acc)):
+    for i, (r, acc) in enumerate(zip(adm_rounds, adm_acc)):
         plt.annotate(f'{acc:.1f}%',
                     xy=(r, acc),
                     xytext=(0, -15),
