@@ -224,11 +224,8 @@ class FedAvgADMStrategy(FedAvg):
 
         accuracy = sum(accuracies) / sum(examples) if sum(examples) > 0 else 0
 
-        self.accuracies.append(accuracy)
-
-        logging.info(f"\n{'='*60}")
-        logging.info(f"Round {rnd} - Global Accuracy: {100 * accuracy:.2f}%")
-        logging.info(f"{'='*60}\n")
+        # Don't append here - already done in aggregate_fit
+        logging.info(f"Client-side evaluation: {100 * accuracy:.2f}%")
 
         return accuracy, {"accuracy": accuracy}
 
@@ -363,11 +360,8 @@ class FedAvgBaselineStrategy(FedAvg):
         examples = [r.num_examples for _, r in results]
         accuracy = sum(accuracies) / sum(examples) if sum(examples) > 0 else 0
 
-        self.accuracies.append(accuracy)
-
-        logging.info(f"\n{'='*60}")
-        logging.info(f"Round {rnd} - Global Accuracy: {100 * accuracy:.2f}%")
-        logging.info(f"{'='*60}\n")
+        # Don't append here - already done in aggregate_fit
+        logging.info(f"Client-side evaluation: {100 * accuracy:.2f}%")
 
         return accuracy, {"accuracy": accuracy}
 
