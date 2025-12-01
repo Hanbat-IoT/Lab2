@@ -444,14 +444,19 @@ class FedAvgBWAStrategy(FedAvg):
         self.prev_accuracy = None
         
         # Initialize BWA algorithm
+        # State dimension: [loss, accuracy, round_time] + [data_dist per client]
+        state_dim = 3 + num_clients
         self.bwa = BWAAlgorithm(
             num_clients=num_clients,
             batch_size_options=batch_size_options,
+            state_dim=state_dim,
             learning_rate_actor=1e-4,
             learning_rate_critic=1e-3,
             gamma=0.99,
             ppo_epochs=10
         )
+        
+        logging.info(f"BWA state dimension: {state_dim} (3 metrics + {num_clients} clients)")
         
         logging.info("Initialized FedAvg+BWA Strategy with DRL-based batch size optimization")
 

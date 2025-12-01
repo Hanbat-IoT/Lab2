@@ -18,7 +18,7 @@ def load_results(filename):
 
 
 def plot_accuracy_comparison(baseline_results, adm_results, save_path='comparison_accuracy.png'):
-    """Plot accuracy comparison between FedAvg and FedAvg+ADM"""
+    """Plot accuracy comparison between baseline and proposed strategy"""
 
     baseline_acc = [acc * 100 for acc in baseline_results.get('accuracies', [])]
     adm_acc = [acc * 100 for acc in adm_results.get('accuracies', [])]
@@ -28,6 +28,10 @@ def plot_accuracy_comparison(baseline_results, adm_results, save_path='compariso
         print("   Make sure both experiments completed successfully")
         return
 
+    # Get strategy names
+    baseline_name = baseline_results.get('strategy', 'Baseline')
+    proposed_name = adm_results.get('strategy', 'Proposed')
+
     # Handle different lengths by using separate round ranges
     baseline_rounds = range(1, len(baseline_acc) + 1)
     adm_rounds = range(1, len(adm_acc) + 1)
@@ -36,9 +40,9 @@ def plot_accuracy_comparison(baseline_results, adm_results, save_path='compariso
 
     # Plot lines with separate round ranges
     plt.plot(baseline_rounds, baseline_acc, marker='o', linewidth=2.5, markersize=8,
-             label='FedAvg (Baseline)', color='#1f77b4', alpha=0.8)
+             label=f'{baseline_name}', color='#1f77b4', alpha=0.8)
     plt.plot(adm_rounds, adm_acc, marker='s', linewidth=2.5, markersize=8,
-             label='FedAvg + ADM (Proposed)', color='#ff7f0e', alpha=0.8)
+             label=f'{proposed_name}', color='#ff7f0e', alpha=0.8)
 
     # Add accuracy annotations for each round
     for i, (r, acc) in enumerate(zip(baseline_rounds, baseline_acc)):
@@ -66,7 +70,7 @@ def plot_accuracy_comparison(baseline_results, adm_results, save_path='compariso
     
     # Add dataset info to title
     dataset = baseline_results.get('dataset', 'unknown').upper()
-    plt.title(f'FedAvg vs FedAvg+ADM: Accuracy Comparison ({dataset})', fontsize=15, fontweight='bold')
+    plt.title(f'{baseline_name} vs {proposed_name}: Accuracy Comparison ({dataset})', fontsize=15, fontweight='bold')
     
     plt.legend(fontsize=12, loc='lower right')
     plt.grid(True, alpha=0.3, linestyle='--')
@@ -79,7 +83,7 @@ def plot_accuracy_comparison(baseline_results, adm_results, save_path='compariso
 
 
 def plot_training_time_comparison(baseline_results, adm_results, save_path='comparison_training_time.png'):
-    """Plot training time comparison between FedAvg and FedAvg+ADM"""
+    """Plot training time comparison between baseline and proposed strategy"""
 
     baseline_times = baseline_results.get('round_times', [])
     adm_times = adm_results.get('round_times', [])
@@ -87,6 +91,10 @@ def plot_training_time_comparison(baseline_results, adm_results, save_path='comp
     if not baseline_times or not adm_times:
         print("⚠️  Cannot plot training time comparison: missing time data")
         return
+
+    # Get strategy names
+    baseline_name = baseline_results.get('strategy', 'Baseline')
+    proposed_name = adm_results.get('strategy', 'Proposed')
 
     # Calculate cumulative times
     baseline_cumulative = np.cumsum(baseline_times)
@@ -99,9 +107,9 @@ def plot_training_time_comparison(baseline_results, adm_results, save_path='comp
 
     # Plot 1: Round time comparison
     ax1.plot(baseline_rounds, baseline_times, marker='o', linewidth=2.5, markersize=8,
-             label='FedAvg (Baseline)', color='#1f77b4', alpha=0.8)
+             label=f'{baseline_name}', color='#1f77b4', alpha=0.8)
     ax1.plot(adm_rounds, adm_times, marker='s', linewidth=2.5, markersize=8,
-             label='FedAvg + ADM (Proposed)', color='#ff7f0e', alpha=0.8)
+             label=f'{proposed_name}', color='#ff7f0e', alpha=0.8)
 
     ax1.set_xlabel('Communication Round', fontsize=13, fontweight='bold')
     ax1.set_ylabel('Round Time (seconds)', fontsize=13, fontweight='bold')
@@ -123,9 +131,9 @@ def plot_training_time_comparison(baseline_results, adm_results, save_path='comp
 
     # Plot 2: Cumulative time comparison
     ax2.plot(baseline_rounds, baseline_cumulative, marker='o', linewidth=2.5, markersize=8,
-             label='FedAvg (Baseline)', color='#1f77b4', alpha=0.8)
+             label=f'{baseline_name}', color='#1f77b4', alpha=0.8)
     ax2.plot(adm_rounds, adm_cumulative, marker='s', linewidth=2.5, markersize=8,
-             label='FedAvg + ADM (Proposed)', color='#ff7f0e', alpha=0.8)
+             label=f'{proposed_name}', color='#ff7f0e', alpha=0.8)
 
     ax2.set_xlabel('Communication Round', fontsize=13, fontweight='bold')
     ax2.set_ylabel('Cumulative Time (seconds)', fontsize=13, fontweight='bold')
@@ -324,7 +332,11 @@ def print_summary(baseline_results, adm_results):
         final_improvement = (adm_acc[-1] - baseline_acc[-1]) * 100
         avg_improvement = (np.mean(adm_acc) - np.mean(baseline_acc)) * 100
 
-        print(f"\nImprovement (FedAvg+ADM vs FedAvg):")
+        # Get strategy names
+        baseline_name = baseline_results.get('strategy', 'FedAvg')
+        proposed_name = adm_results.get('strategy', 'Proposed')
+        
+        print(f"\nImprovement ({proposed_name} vs {baseline_name}):")
         print(f"  Final Accuracy: {final_improvement:+.2f}%")
         print(f"  Average Accuracy: {avg_improvement:+.2f}%")
 
@@ -334,8 +346,8 @@ def print_summary(baseline_results, adm_results):
         adm_rounds = next((i+1 for i, acc in enumerate(adm_acc) if acc >= target_acc), len(adm_acc))
 
         print(f"\nConvergence Speed (to {target_acc*100:.0f}% accuracy):")
-        print(f"  FedAvg:     {baseline_rounds} rounds")
-        print(f"  FedAvg+ADM: {adm_rounds} rounds")
+        print(f"  {baseline_name}: {baseline_rounds} rounds")
+        print(f"  {proposed_name}: {adm_rounds} rounds")
 
         if adm_rounds < baseline_rounds:
             speedup = ((baseline_rounds - adm_rounds) / baseline_rounds) * 100
@@ -348,23 +360,26 @@ def print_summary(baseline_results, adm_results):
         baseline_avg = np.mean(baseline_times)
         adm_avg = np.mean(adm_times)
         
+        baseline_name = baseline_results.get('strategy', 'FedAvg')
+        proposed_name = adm_results.get('strategy', 'Proposed')
+        
         print(f"\nTraining Time:")
-        print(f"  FedAvg Total:     {baseline_total:.2f}s")
-        print(f"  FedAvg+ADM Total: {adm_total:.2f}s")
+        print(f"  {baseline_name} Total:     {baseline_total:.2f}s")
+        print(f"  {proposed_name} Total: {adm_total:.2f}s")
         print(f"  Time Saved:       {baseline_total - adm_total:.2f}s ({((baseline_total - adm_total)/baseline_total*100):.1f}%)")
-        print(f"\n  FedAvg Avg/Round:     {baseline_avg:.2f}s")
-        print(f"  FedAvg+ADM Avg/Round: {adm_avg:.2f}s")
+        print(f"\n  {baseline_name} Avg/Round:     {baseline_avg:.2f}s")
+        print(f"  {proposed_name} Avg/Round: {adm_avg:.2f}s")
         print(f"  Speedup:              {(baseline_avg/adm_avg):.2f}x faster per round")
 
     print("\n" + "="*70)
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Compare FedAvg vs FedAvg+ADM')
+    parser = argparse.ArgumentParser(description='Compare FL Strategies (FedAvg vs FedAvg+ADM/BWA)')
     parser.add_argument('--baseline', type=str, required=True,
                        help='Path to FedAvg baseline results JSON')
-    parser.add_argument('--adm', type=str, required=True,
-                       help='Path to FedAvg+ADM results JSON')
+    parser.add_argument('--proposed', type=str, required=True,
+                       help='Path to proposed strategy results JSON (FedAvg+ADM or FedAvg+BWA)')
     parser.add_argument('--output_dir', type=str, default='.',
                        help='Output directory for plots')
 
@@ -372,61 +387,63 @@ def main():
 
     print("Loading results...")
     baseline_results = load_results(args.baseline)
-    adm_results = load_results(args.adm)
+    proposed_results = load_results(args.proposed)
 
     print(f"Baseline: {baseline_results['strategy']}")
-    print(f"Proposed: {adm_results['strategy']}")
+    print(f"Proposed: {proposed_results['strategy']}")
 
     # Print summary
-    print_summary(baseline_results, adm_results)
+    print_summary(baseline_results, proposed_results)
 
     # Plot accuracy comparison (if data available)
-    if baseline_results.get('accuracies') and adm_results.get('accuracies'):
+    if baseline_results.get('accuracies') and proposed_results.get('accuracies'):
         # Generate filename with dataset info
         dataset = baseline_results.get('dataset', 'unknown')
-        save_path = f'{args.output_dir}/comparison_accuracy_{dataset}.png'
+        strategy_name = proposed_results.get('strategy', 'proposed').lower().replace(' ', '_').replace('+', '')
+        save_path = f'{args.output_dir}/comparison_accuracy_{dataset}_{strategy_name}.png'
         
         plot_accuracy_comparison(
             baseline_results,
-            adm_results,
+            proposed_results,
             save_path=save_path
         )
     else:
         print("\n⚠️  Skipping accuracy comparison plot (missing data)")
 
     # Plot training time comparison
-    if baseline_results.get('round_times') and adm_results.get('round_times'):
+    if baseline_results.get('round_times') and proposed_results.get('round_times'):
         dataset = baseline_results.get('dataset', 'unknown')
-        save_path = f'{args.output_dir}/comparison_training_time_{dataset}.png'
+        strategy_name = proposed_results.get('strategy', 'proposed').lower().replace(' ', '_').replace('+', '')
+        save_path = f'{args.output_dir}/comparison_training_time_{dataset}_{strategy_name}.png'
         
         plot_training_time_comparison(
             baseline_results,
-            adm_results,
+            proposed_results,
             save_path=save_path
         )
     else:
         print("\n⚠️  Skipping training time comparison plot (missing data)")
 
     # Plot v_n evolution (only for ADM)
-    if adm_results.get('v_n_history'):
+    if proposed_results.get('v_n_history'):
         # Generate filename with dataset info
-        dataset = adm_results.get('dataset', 'unknown')
+        dataset = proposed_results.get('dataset', 'unknown')
         save_path = f'{args.output_dir}/v_n_evolution_{dataset}.png'
         
         plot_v_n_evolution(
-            adm_results,
+            proposed_results,
             save_path=save_path
         )
     else:
         print("\n⚠️  Skipping v_n evolution plot (no v_n history)")
     
     # Plot batch size evolution (only for BWA)
-    if adm_results.get('batch_size_history'):
-        dataset = adm_results.get('dataset', 'unknown')
+    if proposed_results.get('batch_size_history'):
+        dataset = proposed_results.get('dataset', 'unknown')
         save_path = f'{args.output_dir}/batch_size_evolution_{dataset}.png'
         
         plot_batch_size_evolution(
-            adm_results,
+            proposed_results,
             save_path=save_path
         )
         print("\n✅ BWA batch size evolution plotted!")
