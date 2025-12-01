@@ -17,6 +17,7 @@ import json
 from collections import OrderedDict
 from models import get_model
 from ADM import init_param_hetero, block_coordinate_descent
+from BWA import BWAAlgorithm, create_state
 import time
 import utils
 import updateModel
@@ -413,11 +414,273 @@ class FedAvgBaselineStrategy(FedAvg):
             logging.info(f"Average round time: {sum(self.round_times)/len(self.round_times):.2f}s")
 
 
+class FedAvgBWAStrategy(FedAvg):
+    """
+    FedAvg + BWA Strategy
+    DRL 기반 동적 배치 크기 최적화
+    """
+    def __init__(
+        self,
+        num_clients: int,
+        dataset: str,
+        num_rounds: int,
+        batch_size_options=[16, 32, 64, 128],
+        **kwargs
+    ):
+        super().__init__(**kwargs)
+        self.num_clients = num_clients
+        self.dataset = dataset
+        self.num_rounds = num_rounds
+        self.batch_size_options = batch_size_options
+        
+        # Performance tracking
+        self.accuracies = []
+        self.round_times = []
+        self.batch_size_history = []
+        self.round_start_time = None
+        
+        # Previous metrics for reward calculation
+        self.prev_loss = None
+        self.prev_accuracy = None
+        
+        # Initialize BWA algorithm
+        self.bwa = BWAAlgorithm(
+            num_clients=num_clients,
+            batch_size_options=batch_size_options,
+            learning_rate_actor=1e-4,
+            learning_rate_critic=1e-3,
+            gamma=0.99,
+            ppo_epochs=10
+        )
+        
+        logging.info("Initialized FedAvg+BWA Strategy with DRL-based batch size optimization")
+
+    def initialize_parameters(self, client_manager):
+        """Initialize global model parameters"""
+        model = get_model(self.dataset)
+        params = [val.cpu().numpy() for _, val in model.state_dict().items()]
+        return fl.common.weights_to_parameters(params)
+
+    def configure_fit(
+        self, rnd: int, parameters: Parameters, client_manager
+    ) -> List[Tuple[fl.server.client_proxy.ClientProxy, fl.common.FitIns]]:
+        """Configure clients with BWA-optimized batch sizes"""
+        
+        self.round_start_time = time.time()
+        
+        logging.info(f"\n{'='*60}")
+        logging.info(f"Round {rnd}/{self.num_rounds}")
+        logging.info(f"{'='*60}")
+        
+        # Create state for BWA
+        if self.prev_accuracy is not None:
+            # Calculate data distribution (simplified)
+            data_distribution = [1.0 / self.num_clients] * self.num_clients
+            
+            state = create_state(
+                loss=self.prev_loss if self.prev_loss else 1.0,
+                accuracy=self.prev_accuracy if self.prev_accuracy else 0.0,
+                data_distribution=data_distribution,
+                round_time=self.round_times[-1] if self.round_times else 10.0
+            )
+            
+            # Get action (batch size) from BWA
+            action_idx, batch_size = self.bwa.get_action(state)
+            logging.info(f"\n[BWA] Selected batch size: {batch_size}")
+        else:
+            # First round: use default batch size
+            batch_size = 32
+            action_idx = self.batch_size_options.index(batch_size) if batch_size in self.batch_size_options else 1
+            logging.info(f"\n[BWA] First round - using default batch size: {batch_size}")
+        
+        self.batch_size_history.append(batch_size)
+        
+        # Get clients
+        clients = client_manager.sample(
+            num_clients=self.num_clients,
+            min_num_clients=self.num_clients
+        )
+        
+        # Configure each client with BWA-optimized batch size
+        config_list = []
+        for idx, client in enumerate(clients):
+            config = {
+                "server_round": rnd,
+                "local_epochs": 5,
+                "batch_size": batch_size,  # BWA optimized
+                "v_n": 1.0,
+                "client_id": idx
+            }
+            fit_ins = fl.common.FitIns(parameters, config)
+            config_list.append((client, fit_ins))
+        
+        logging.info(f"All clients: batch_size = {batch_size} (BWA optimized)")
+        
+        return config_list
+
+    def aggregate_fit(
+        self,
+        rnd: int,
+        results: List[Tuple[fl.server.client_proxy.ClientProxy, FitRes]],
+        failures: List[BaseException],
+    ) -> Tuple[Optional[Parameters], Dict[str, Scalar]]:
+        """Aggregate client updates and train BWA"""
+        
+        if not results:
+            return None, {}
+        
+        # Log client training info
+        total_samples = 0
+        for _, fit_res in results:
+            num_samples = fit_res.num_examples
+            training_time = fit_res.metrics.get("training_time", 0)
+            client_id = fit_res.metrics.get("client_id", -1)
+            total_samples += num_samples
+            
+            logging.info(
+                f"Client {client_id}: {num_samples} samples, "
+                f"training time: {training_time:.2f}s"
+            )
+        
+        # Aggregate parameters
+        aggregated_params, metrics = super().aggregate_fit(
+            rnd, results, failures
+        )
+        
+        # Evaluate and update BWA
+        if aggregated_params and len(self.accuracies) < rnd:
+            # Evaluate global model
+            accuracy = self._evaluate_global_model(aggregated_params)
+            loss = 1.0 - accuracy  # Simplified loss
+            
+            self.accuracies.append(accuracy)
+            
+            # Record round time
+            if self.round_start_time is not None:
+                round_time = time.time() - self.round_start_time
+                self.round_times.append(round_time)
+            
+            # BWA: Calculate reward and store experience
+            if self.prev_accuracy is not None:
+                # Calculate improvements
+                accuracy_improvement = accuracy - self.prev_accuracy
+                loss_improvement = self.prev_loss - loss
+                time_cost = self.round_times[-1] if self.round_times else 10.0
+                
+                # Calculate reward
+                reward = self.bwa.calculate_reward(
+                    loss_improvement=loss_improvement,
+                    accuracy_improvement=accuracy_improvement,
+                    time_cost=time_cost,
+                    lambda_k=1.0
+                )
+                
+                # Create states
+                data_distribution = [1.0 / self.num_clients] * self.num_clients
+                prev_state = create_state(
+                    self.prev_loss, self.prev_accuracy,
+                    data_distribution,
+                    self.round_times[-2] if len(self.round_times) > 1 else 10.0
+                )
+                curr_state = create_state(
+                    loss, accuracy,
+                    data_distribution,
+                    time_cost
+                )
+                
+                # Store experience
+                action_idx = self.batch_size_options.index(self.batch_size_history[-1])
+                self.bwa.store_experience(prev_state, action_idx, curr_state, reward)
+                
+                logging.info(f"[BWA] Reward: {reward:.4f}, Buffer size: {len(self.bwa.experience_buffer)}")
+                
+                # Train BWA networks
+                if len(self.bwa.experience_buffer) >= 32:
+                    actor_loss, critic_loss = self.bwa.train_step(batch_size=32)
+                    if actor_loss is not None:
+                        logging.info(f"[BWA] Actor Loss: {actor_loss:.4f}, Critic Loss: {critic_loss:.4f}")
+            
+            # Update previous metrics
+            self.prev_loss = loss
+            self.prev_accuracy = accuracy
+            
+            logging.info(f"\n{'='*60}")
+            logging.info(f"Round {rnd} - Global Accuracy: {100 * accuracy:.2f}%")
+            if self.round_times:
+                logging.info(f"Round Time: {self.round_times[-1]:.2f}s")
+            logging.info(f"{'='*60}\n")
+        
+        return aggregated_params, metrics
+
+    def _evaluate_global_model(self, parameters):
+        """Evaluate global model on test set"""
+        generator = utils.get_data(self.dataset)
+        generator.load_data()
+        testset = generator.testset
+        
+        weights = fl.common.parameters_to_weights(parameters)
+        model = get_model(self.dataset)
+        
+        params_dict = zip(model.state_dict().keys(), weights)
+        state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
+        model.load_state_dict(state_dict, strict=True)
+        
+        testloader = updateModel.get_testloader(testset, batch_size=1000)
+        accuracy = updateModel.test(model, testloader)
+        
+        return accuracy
+
+    def aggregate_evaluate(
+        self,
+        rnd: int,
+        results: List[Tuple[fl.server.client_proxy.ClientProxy, fl.common.EvaluateRes]],
+        failures: List[BaseException],
+    ) -> Tuple[Optional[float], Dict[str, Scalar]]:
+        """Aggregate evaluation results"""
+        
+        if not results:
+            return None, {}
+        
+        accuracies = [r.metrics["accuracy"] * r.num_examples for _, r in results]
+        examples = [r.num_examples for _, r in results]
+        accuracy = sum(accuracies) / sum(examples) if sum(examples) > 0 else 0
+        
+        logging.info(f"Client-side evaluation: {100 * accuracy:.2f}%")
+        
+        return accuracy, {"accuracy": accuracy}
+
+    def save_results(self, filename: str):
+        """Save experiment results"""
+        results = {
+            "strategy": "FedAvg+BWA",
+            "dataset": self.dataset,
+            "num_clients": self.num_clients,
+            "num_rounds": len(self.accuracies),
+            "accuracies": self.accuracies,
+            "round_times": self.round_times,
+            "batch_size_history": self.batch_size_history,
+            "total_time": sum(self.round_times) if self.round_times else 0,
+            "avg_round_time": sum(self.round_times) / len(self.round_times) if self.round_times else 0
+        }
+        
+        with open(filename, 'w') as f:
+            json.dump(results, f, indent=2)
+        
+        logging.info(f"Results saved to {filename}")
+        if self.round_times:
+            logging.info(f"Total training time: {sum(self.round_times):.2f}s")
+            logging.info(f"Average round time: {sum(self.round_times)/len(self.round_times):.2f}s")
+        
+        # Save BWA models
+        bwa_model_path = filename.replace('.json', '_bwa')
+        self.bwa.save_models(bwa_model_path)
+
+
 def main():
     parser = argparse.ArgumentParser(description='Flower FL Server')
     parser.add_argument('--strategy', type=str, default='fedavg_adm',
-                       choices=['fedavg', 'fedavg_adm'],
-                       help='Strategy: fedavg (baseline) or fedavg_adm')
+                       choices=['fedavg', 'fedavg_adm', 'fedavg_bwa'],
+                       help='Strategy: fedavg (baseline), fedavg_adm, or fedavg_bwa')
     parser.add_argument('--num_clients', type=int, default=3,
                        help='Number of clients')
     parser.add_argument('--num_rounds', type=int, default=10,
@@ -470,6 +733,15 @@ def main():
             num_clients=args.num_clients,
             dataset=args.dataset,
             adm_params=adm_params,
+            min_available_clients=args.num_clients,
+        )
+        result_file = f"results_{args.strategy}_{args.dataset}_{args.num_clients}clients_{timestamp}.json"
+    elif args.strategy == 'fedavg_bwa':
+        strategy = FedAvgBWAStrategy(
+            num_clients=args.num_clients,
+            dataset=args.dataset,
+            num_rounds=args.num_rounds,
+            batch_size_options=[16, 32, 64, 128],
             min_available_clients=args.num_clients,
         )
         result_file = f"results_{args.strategy}_{args.dataset}_{args.num_clients}clients_{timestamp}.json"

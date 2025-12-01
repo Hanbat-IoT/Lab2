@@ -152,6 +152,58 @@ def plot_training_time_comparison(baseline_results, adm_results, save_path='comp
     plt.show()
 
 
+def plot_batch_size_evolution(bwa_results, save_path='batch_size_evolution.png'):
+    """Plot batch size evolution for BWA strategy"""
+    
+    if 'batch_size_history' not in bwa_results:
+        print("No batch size history found in BWA results")
+        return
+    
+    batch_sizes = bwa_results['batch_size_history']
+    
+    if not batch_sizes:
+        print("No batch size data available")
+        return
+    
+    plt.figure(figsize=(14, 7))
+    
+    rounds = range(1, len(batch_sizes) + 1)
+    
+    plt.plot(rounds, batch_sizes, marker='o', linewidth=2.5, markersize=10,
+            color='#2ca02c', alpha=0.8, label='BWA Batch Size')
+    
+    # Add batch size annotations
+    for r, bs in zip(rounds, batch_sizes):
+        plt.annotate(f'{bs}',
+                    xy=(r, bs),
+                    xytext=(0, 10),
+                    textcoords='offset points',
+                    fontsize=10,
+                    color='#2ca02c',
+                    ha='center',
+                    fontweight='bold')
+    
+    # Add average line
+    avg_batch_size = np.mean(batch_sizes)
+    plt.axhline(y=avg_batch_size, color='gray', linestyle='--', alpha=0.5, 
+                linewidth=2, label=f'Average: {avg_batch_size:.1f}')
+    
+    plt.xlabel('Communication Round', fontsize=13, fontweight='bold')
+    plt.ylabel('Batch Size', fontsize=13, fontweight='bold')
+    
+    dataset = bwa_results.get('dataset', 'unknown').upper()
+    plt.title(f'BWA: Dynamic Batch Size Evolution ({dataset})', fontsize=15, fontweight='bold')
+    
+    plt.legend(fontsize=12, loc='best')
+    plt.grid(True, alpha=0.3, linestyle='--')
+    plt.tight_layout()
+    
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    print(f"📊 Batch size evolution plot saved to {save_path}")
+    
+    plt.show()
+
+
 def plot_v_n_evolution(adm_results, save_path='v_n_evolution.png'):
     """Plot v_n values evolution over rounds"""
 
@@ -367,6 +419,17 @@ def main():
         )
     else:
         print("\n⚠️  Skipping v_n evolution plot (no v_n history)")
+    
+    # Plot batch size evolution (only for BWA)
+    if adm_results.get('batch_size_history'):
+        dataset = adm_results.get('dataset', 'unknown')
+        save_path = f'{args.output_dir}/batch_size_evolution_{dataset}.png'
+        
+        plot_batch_size_evolution(
+            adm_results,
+            save_path=save_path
+        )
+        print("\n✅ BWA batch size evolution plotted!")
 
     print("\n✅ Comparison completed!")
 
