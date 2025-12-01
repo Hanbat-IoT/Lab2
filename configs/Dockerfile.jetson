@@ -26,12 +26,8 @@ RUN echo "nameserver 8.8.8.8" > /etc/resolv.conf && \
     libopenblas-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install cuDNN (required by PyTorch)
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    libcudnn8=8.2.1.32-1+cuda10.2 \
-    || apt-get install -y --no-install-recommends libcudnn8 \
-    && rm -rf /var/lib/apt/lists/*
+# cuDNN will be mounted from host system via docker run -v
+# Skip cuDNN installation in container to avoid corrupted files from base image
 
 # Upgrade pip (compatible with Python 3.6)
 RUN python3 -m pip install --upgrade pip==21.3.1
