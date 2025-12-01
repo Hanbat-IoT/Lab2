@@ -58,9 +58,8 @@ RUN pip3 install --no-cache-dir --timeout=300 --retries=5 \
     tqdm==4.62.3 \
     psutil==5.8.0
 
-# Copy application files (Python 3.6 compatible version)
-COPY flower_client_jetson_py36.py flower_client.py
-COPY models.py utils.py updateModel.py dists.py ./
+# Copy application files (use main flower_client.py - Python 3.6.9 supports f-strings)
+COPY flower_client.py models.py utils.py updateModel.py dists.py ./
 
 # Expose port
 EXPOSE 8080
