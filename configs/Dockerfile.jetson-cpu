@@ -8,9 +8,8 @@ WORKDIR /app
 
 # Fix DNS and install system dependencies
 RUN echo "nameserver 8.8.8.8" > /etc/resolv.conf && \
-    echo "nameserver 8.8.4.4" >> /etc/resolv.conf && \
-    apt-get update && \
-    apt-get install -y \
+    apt-get -o Acquire::ForceIPv4=true update && \
+    apt-get -o Acquire::ForceIPv4=true install -y \
     python3.8 \
     python3-pip \
     build-essential \
