@@ -39,7 +39,16 @@ RUN pip3 install --no-cache-dir \
     numpy==1.19.5 \
     flwr==0.18.0
 
-RUN pip3 install --no-cache-dir --timeout=300 \
+RUN pip3 install --no-cache-dir --timeout=300 --retries=5 \
+    typing-extensions==4.1.1 \
+    cvxpy==1.1.18 \
+    scs==2.1.4 \
+    ecos==2.0.10 \
+    matplotlib==3.3.4 \
+    pandas==1.1.5 \
+    tqdm==4.62.3 \
+    psutil==5.8.0 || \
+    pip3 install --no-cache-dir --timeout=300 --no-deps \
     typing-extensions==4.1.1 \
     cvxpy==1.1.18 \
     scs==2.1.4 \
