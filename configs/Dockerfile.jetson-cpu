@@ -7,8 +7,7 @@ FROM ubuntu:18.04
 WORKDIR /app
 
 # Fix DNS and install system dependencies
-RUN sed -i 's/ports.ubuntu.com/mirror.kakao.com/g' /etc/apt/sources.list && \
-    echo "nameserver 8.8.8.8" > /etc/resolv.conf && \
+RUN echo "nameserver 8.8.8.8" > /etc/resolv.conf && \
     apt-get -o Acquire::ForceIPv4=true update && \
     apt-get -o Acquire::ForceIPv4=true install -y \
     python3.8 \
