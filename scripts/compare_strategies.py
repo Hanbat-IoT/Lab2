@@ -2,7 +2,7 @@
 FedAvg vs FedAvg+ADM 성능 비교 시각화
 
 사용법:
-  python compare_strategies.py --baseline results_fedavg_3clients.json --adm results_fedavg_adm_3clients.json
+  python compare_strategies.py --baseline results_fedavg_mnist_3clients_20241202_120000.json --adm results_fedavg_adm_mnist_3clients_20241202_120500.json
 """
 
 import json
@@ -63,7 +63,11 @@ def plot_accuracy_comparison(baseline_results, adm_results, save_path='compariso
 
     plt.xlabel('Communication Round', fontsize=13, fontweight='bold')
     plt.ylabel('Test Accuracy (%)', fontsize=13, fontweight='bold')
-    plt.title('FedAvg vs FedAvg+ADM: Accuracy Comparison', fontsize=15, fontweight='bold')
+    
+    # Add dataset info to title
+    dataset = baseline_results.get('dataset', 'unknown').upper()
+    plt.title(f'FedAvg vs FedAvg+ADM: Accuracy Comparison ({dataset})', fontsize=15, fontweight='bold')
+    
     plt.legend(fontsize=12, loc='lower right')
     plt.grid(True, alpha=0.3, linestyle='--')
     plt.tight_layout()
@@ -115,7 +119,11 @@ def plot_v_n_evolution(adm_results, save_path='v_n_evolution.png'):
 
     plt.xlabel('Communication Round', fontsize=13, fontweight='bold')
     plt.ylabel('v_n (Data Usage Ratio)', fontsize=13, fontweight='bold')
-    plt.title('ADM: Client Data Usage (v_n) Evolution', fontsize=15, fontweight='bold')
+    
+    # Add dataset info to title
+    dataset = adm_results.get('dataset', 'unknown').upper()
+    plt.title(f'ADM: Client Data Usage (v_n) Evolution ({dataset})', fontsize=15, fontweight='bold')
+    
     plt.legend(fontsize=11, loc='best')
     plt.grid(True, alpha=0.3, linestyle='--')
     plt.ylim([0.35, 1.05])
@@ -136,20 +144,33 @@ def print_summary(baseline_results, adm_results):
 
     baseline_acc = baseline_results.get('accuracies', [])
     adm_acc = adm_results.get('accuracies', [])
+    
+    # Print dataset info
+    baseline_dataset = baseline_results.get('dataset', 'unknown')
+    adm_dataset = adm_results.get('dataset', 'unknown')
+    baseline_clients = baseline_results.get('num_clients', 'unknown')
+    adm_clients = adm_results.get('num_clients', 'unknown')
 
     # Check if accuracies are available
     if not baseline_acc:
         print(f"\nStrategy: {baseline_results['strategy']}")
+        print(f"  Dataset: {baseline_dataset.upper()}")
+        print(f"  Clients: {baseline_clients}")
         print("  ⚠️  No accuracy data available")
         print(f"  Rounds: {baseline_results.get('num_rounds', 0)}")
     else:
         print(f"\nStrategy: {baseline_results['strategy']}")
+        print(f"  Dataset: {baseline_dataset.upper()}")
+        print(f"  Clients: {baseline_clients}")
+        print(f"  Rounds: {len(baseline_acc)}")
         print(f"  Final Accuracy: {baseline_acc[-1]*100:.2f}%")
         print(f"  Max Accuracy:   {max(baseline_acc)*100:.2f}%")
         print(f"  Avg Accuracy:   {np.mean(baseline_acc)*100:.2f}%")
 
     if not adm_acc:
         print(f"\nStrategy: {adm_results['strategy']}")
+        print(f"  Dataset: {adm_dataset.upper()}")
+        print(f"  Clients: {adm_clients}")
         print("  ⚠️  No accuracy data available")
         print(f"  Rounds: {adm_results.get('num_rounds', 0)}")
         
@@ -162,6 +183,9 @@ def print_summary(baseline_results, adm_results):
                 print(f"    ... ({len(adm_results['v_n_history'])} rounds total)")
     else:
         print(f"\nStrategy: {adm_results['strategy']}")
+        print(f"  Dataset: {adm_dataset.upper()}")
+        print(f"  Clients: {adm_clients}")
+        print(f"  Rounds: {len(adm_acc)}")
         print(f"  Final Accuracy: {adm_acc[-1]*100:.2f}%")
         print(f"  Max Accuracy:   {max(adm_acc)*100:.2f}%")
         print(f"  Avg Accuracy:   {np.mean(adm_acc)*100:.2f}%")
@@ -215,19 +239,27 @@ def main():
 
     # Plot accuracy comparison (if data available)
     if baseline_results.get('accuracies') and adm_results.get('accuracies'):
+        # Generate filename with dataset info
+        dataset = baseline_results.get('dataset', 'unknown')
+        save_path = f'{args.output_dir}/comparison_accuracy_{dataset}.png'
+        
         plot_accuracy_comparison(
             baseline_results,
             adm_results,
-            save_path=f'{args.output_dir}/comparison_accuracy.png'
+            save_path=save_path
         )
     else:
         print("\n⚠️  Skipping accuracy comparison plot (missing data)")
 
     # Plot v_n evolution (only for ADM)
     if adm_results.get('v_n_history'):
+        # Generate filename with dataset info
+        dataset = adm_results.get('dataset', 'unknown')
+        save_path = f'{args.output_dir}/v_n_evolution_{dataset}.png'
+        
         plot_v_n_evolution(
             adm_results,
-            save_path=f'{args.output_dir}/v_n_evolution.png'
+            save_path=save_path
         )
     else:
         print("\n⚠️  Skipping v_n evolution plot (no v_n history)")

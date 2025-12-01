@@ -172,7 +172,8 @@ class FedAvgADMStrategy(FedAvg):
         )
         
         # Manually evaluate on server (Flower 0.18.0 workaround)
-        if aggregated_params:
+        # Only evaluate once per round (not per client)
+        if aggregated_params and len(self.accuracies) < rnd:
             accuracy = self._evaluate_global_model(aggregated_params)
             self.accuracies.append(accuracy)
             
@@ -233,24 +234,20 @@ class FedAvgADMStrategy(FedAvg):
 
     def save_results(self, filename: str):
         """Save experiment results"""
-        # Use v_n_history length as num_rounds if accuracies is empty
-        num_rounds = len(self.accuracies) if self.accuracies else len(self.v_n_history)
-        
         results = {
             "strategy": "FedAvg+ADM",
-            "num_rounds": num_rounds,
+            "dataset": self.dataset,
+            "num_clients": self.num_clients,
+            "num_rounds": len(self.accuracies),
             "accuracies": self.accuracies,
             "v_n_history": self.v_n_history,
-            "adm_params": self.adm_params,
-            "note": "Flower 0.18.0 does not auto-evaluate. Accuracies may be empty."
+            "adm_params": self.adm_params
         }
 
         with open(filename, 'w') as f:
             json.dump(results, f, indent=2)
 
         logging.info(f"Results saved to {filename}")
-        if not self.accuracies:
-            logging.warning("No accuracies recorded. Flower 0.18.0 requires manual evaluation.")
 
 
 class FedAvgBaselineStrategy(FedAvg):
@@ -283,8 +280,8 @@ class FedAvgBaselineStrategy(FedAvg):
             rnd, results, failures
         )
         
-        # Manually evaluate on server
-        if aggregated_params:
+        # Manually evaluate on server (only once per round)
+        if aggregated_params and len(self.accuracies) < rnd:
             accuracy = self._evaluate_global_model(aggregated_params)
             self.accuracies.append(accuracy)
             
@@ -378,17 +375,16 @@ class FedAvgBaselineStrategy(FedAvg):
         """Save experiment results"""
         results = {
             "strategy": "FedAvg (Baseline)",
-            "num_rounds": self.num_rounds,
-            "accuracies": self.accuracies,
-            "note": "Flower 0.18.0 does not auto-evaluate. Accuracies may be empty."
+            "dataset": self.dataset,
+            "num_clients": self.num_clients,
+            "num_rounds": len(self.accuracies),
+            "accuracies": self.accuracies
         }
 
         with open(filename, 'w') as f:
             json.dump(results, f, indent=2)
 
         logging.info(f"Results saved to {filename}")
-        if not self.accuracies:
-            logging.warning("No accuracies recorded. Flower 0.18.0 requires manual evaluation.")
 
 
 def main():
@@ -438,6 +434,10 @@ def main():
         'rounds': args.num_rounds
     }
 
+    # Generate unique filename with timestamp
+    from datetime import datetime
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
     # Select strategy (Flower 0.18.0 API)
     if args.strategy == 'fedavg_adm':
         strategy = FedAvgADMStrategy(
@@ -446,7 +446,7 @@ def main():
             adm_params=adm_params,
             min_available_clients=args.num_clients,
         )
-        result_file = f"results_{args.strategy}_{args.num_clients}clients.json"
+        result_file = f"results_{args.strategy}_{args.dataset}_{args.num_clients}clients_{timestamp}.json"
     else:
         strategy = FedAvgBaselineStrategy(
             num_clients=args.num_clients,
@@ -454,7 +454,7 @@ def main():
             num_rounds=args.num_rounds,
             min_available_clients=args.num_clients,
         )
-        result_file = f"results_{args.strategy}_{args.num_clients}clients.json"
+        result_file = f"results_{args.strategy}_{args.dataset}_{args.num_clients}clients_{timestamp}.json"
 
     # Start server (Flower 0.18.0 API)
     fl.server.start_server(
