@@ -23,9 +23,6 @@ RUN python3 -m pip install --upgrade pip
 RUN pip3 install --no-cache-dir --timeout=300 --retries=5 \
     torch==1.10.0 \
     torchvision==0.11.1 \
-
-# Install Flower and other dependencies
-RUN pip3 install --no-cache-dir --timeout=300 --retries=5 \
     numpy==1.21.0 \
     flwr==0.18.0
 
