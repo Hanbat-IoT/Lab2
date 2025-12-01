@@ -125,9 +125,9 @@ class BWAAlgorithm:
         self.ppo_epochs = ppo_epochs
         self.ppo_clip = ppo_clip
         
-        # State dimension: [loss, accuracy, data_distribution, round_time]
+        # State dimension: [loss, accuracy, round_time] + [data_distribution per client]
         if state_dim is None:
-            state_dim = 4 + num_clients  # 4 global metrics + per-client data distribution
+            state_dim = 3 + num_clients  # 3 global metrics + per-client data distribution
         self.state_dim = state_dim
         
         # Initialize Actor network θ_a
