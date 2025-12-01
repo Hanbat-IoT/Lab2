@@ -1,8 +1,7 @@
 """
 Federated Learning Client using Flower Framework
-각 디바이스(Jetson Nano, Raspberry Pi, 노트북)에서 실행
 
-실행 예시:
+example:
   python flower_client.py --client_id 0 --server_address 192.168.0.100:8080 --dataset mnist
 """
 
