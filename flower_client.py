@@ -30,9 +30,6 @@ logging.basicConfig(
 
 
 class FlowerClient(fl.client.Client):
-    """
-    Flower Client Implementation (Flower 0.18.0 API)
-    """
 
     def __init__(self, client_id: int, dataset: str, data_size: int = 2500):
         self.client_id = client_id
