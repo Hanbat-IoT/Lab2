@@ -39,7 +39,7 @@ RUN pip3 install --no-cache-dir \
     numpy==1.19.5 \
     flwr==0.18.0
 
-RUN pip3 install --no-cache-dir \
+RUN pip3 install --no-cache-dir --timeout=300 \
     typing-extensions==4.1.1 \
     cvxpy==1.1.18 \
     scs==2.1.4 \
