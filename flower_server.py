@@ -55,6 +55,7 @@ class FedAvgADMStrategy(FedAvg):
         self.round_times = []
         self.accuracies = []
         self.v_n_history = []
+        self.round_start_time = None
 
         logging.info("Initialized FedAvgADMStrategy with ADM optimization")
 
@@ -73,6 +74,7 @@ class FedAvgADMStrategy(FedAvg):
         라운드 시작 시 호출: ADM 최적화 수행 및 클라이언트 설정 (Flower 0.18.0 API)
         """
         self.current_round = rnd - 1  # 0-indexed
+        self.round_start_time = time.time()  # 라운드 시작 시간 기록
 
         logging.info(f"\n{'='*60}")
         logging.info(f"Round {rnd}/{self.adm_params['rounds']}")
@@ -177,8 +179,15 @@ class FedAvgADMStrategy(FedAvg):
             accuracy = self._evaluate_global_model(aggregated_params)
             self.accuracies.append(accuracy)
             
+            # 라운드 시간 기록
+            if self.round_start_time is not None:
+                round_time = time.time() - self.round_start_time
+                self.round_times.append(round_time)
+            
             logging.info(f"\n{'='*60}")
             logging.info(f"Round {rnd} - Global Accuracy: {100 * accuracy:.2f}%")
+            if self.round_times:
+                logging.info(f"Round Time: {self.round_times[-1]:.2f}s")
             logging.info(f"{'='*60}\n")
 
         return aggregated_params, metrics
@@ -237,6 +246,9 @@ class FedAvgADMStrategy(FedAvg):
             "num_clients": self.num_clients,
             "num_rounds": len(self.accuracies),
             "accuracies": self.accuracies,
+            "round_times": self.round_times,
+            "total_time": sum(self.round_times) if self.round_times else 0,
+            "avg_round_time": sum(self.round_times) / len(self.round_times) if self.round_times else 0,
             "v_n_history": self.v_n_history,
             "adm_params": self.adm_params
         }
@@ -245,6 +257,9 @@ class FedAvgADMStrategy(FedAvg):
             json.dump(results, f, indent=2)
 
         logging.info(f"Results saved to {filename}")
+        if self.round_times:
+            logging.info(f"Total training time: {sum(self.round_times):.2f}s")
+            logging.info(f"Average round time: {sum(self.round_times)/len(self.round_times):.2f}s")
 
 
 class FedAvgBaselineStrategy(FedAvg):
@@ -258,6 +273,8 @@ class FedAvgBaselineStrategy(FedAvg):
         self.dataset = dataset
         self.num_rounds = num_rounds
         self.accuracies = []
+        self.round_times = []
+        self.round_start_time = None
 
         logging.info("Initialized FedAvg Baseline Strategy (no ADM)")
     
@@ -282,8 +299,15 @@ class FedAvgBaselineStrategy(FedAvg):
             accuracy = self._evaluate_global_model(aggregated_params)
             self.accuracies.append(accuracy)
             
+            # 라운드 시간 기록
+            if self.round_start_time is not None:
+                round_time = time.time() - self.round_start_time
+                self.round_times.append(round_time)
+            
             logging.info(f"\n{'='*60}")
             logging.info(f"Round {rnd} - Global Accuracy: {100 * accuracy:.2f}%")
+            if self.round_times:
+                logging.info(f"Round Time: {self.round_times[-1]:.2f}s")
             logging.info(f"{'='*60}\n")
 
         return aggregated_params, metrics
@@ -319,6 +343,8 @@ class FedAvgBaselineStrategy(FedAvg):
         self, rnd: int, parameters: Parameters, client_manager
     ) -> List[Tuple[fl.server.client_proxy.ClientProxy, fl.common.FitIns]]:
         """Configure clients (all with v_n=1.0) - Flower 0.18.0 API"""
+
+        self.round_start_time = time.time()  # 라운드 시작 시간 기록
 
         logging.info(f"\n{'='*60}")
         logging.info(f"Round {rnd}/{self.num_rounds}")
@@ -372,13 +398,19 @@ class FedAvgBaselineStrategy(FedAvg):
             "dataset": self.dataset,
             "num_clients": self.num_clients,
             "num_rounds": len(self.accuracies),
-            "accuracies": self.accuracies
+            "accuracies": self.accuracies,
+            "round_times": self.round_times,
+            "total_time": sum(self.round_times) if self.round_times else 0,
+            "avg_round_time": sum(self.round_times) / len(self.round_times) if self.round_times else 0
         }
 
         with open(filename, 'w') as f:
             json.dump(results, f, indent=2)
 
         logging.info(f"Results saved to {filename}")
+        if self.round_times:
+            logging.info(f"Total training time: {sum(self.round_times):.2f}s")
+            logging.info(f"Average round time: {sum(self.round_times)/len(self.round_times):.2f}s")
 
 
 def main():

@@ -78,6 +78,80 @@ def plot_accuracy_comparison(baseline_results, adm_results, save_path='compariso
     plt.show()
 
 
+def plot_training_time_comparison(baseline_results, adm_results, save_path='comparison_training_time.png'):
+    """Plot training time comparison between FedAvg and FedAvg+ADM"""
+
+    baseline_times = baseline_results.get('round_times', [])
+    adm_times = adm_results.get('round_times', [])
+
+    if not baseline_times or not adm_times:
+        print("⚠️  Cannot plot training time comparison: missing time data")
+        return
+
+    # Calculate cumulative times
+    baseline_cumulative = np.cumsum(baseline_times)
+    adm_cumulative = np.cumsum(adm_times)
+
+    baseline_rounds = range(1, len(baseline_times) + 1)
+    adm_rounds = range(1, len(adm_times) + 1)
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+
+    # Plot 1: Round time comparison
+    ax1.plot(baseline_rounds, baseline_times, marker='o', linewidth=2.5, markersize=8,
+             label='FedAvg (Baseline)', color='#1f77b4', alpha=0.8)
+    ax1.plot(adm_rounds, adm_times, marker='s', linewidth=2.5, markersize=8,
+             label='FedAvg + ADM (Proposed)', color='#ff7f0e', alpha=0.8)
+
+    ax1.set_xlabel('Communication Round', fontsize=13, fontweight='bold')
+    ax1.set_ylabel('Round Time (seconds)', fontsize=13, fontweight='bold')
+    
+    dataset = baseline_results.get('dataset', 'unknown').upper()
+    ax1.set_title(f'Per-Round Training Time ({dataset})', fontsize=15, fontweight='bold')
+    ax1.legend(fontsize=12, loc='best')
+    ax1.grid(True, alpha=0.3, linestyle='--')
+
+    # Add average time annotations
+    baseline_avg = np.mean(baseline_times)
+    adm_avg = np.mean(adm_times)
+    ax1.axhline(y=baseline_avg, color='#1f77b4', linestyle=':', alpha=0.5, linewidth=2)
+    ax1.axhline(y=adm_avg, color='#ff7f0e', linestyle=':', alpha=0.5, linewidth=2)
+    ax1.text(len(baseline_rounds)*0.7, baseline_avg*1.05, f'Avg: {baseline_avg:.1f}s', 
+             color='#1f77b4', fontweight='bold', fontsize=10)
+    ax1.text(len(adm_rounds)*0.7, adm_avg*1.05, f'Avg: {adm_avg:.1f}s', 
+             color='#ff7f0e', fontweight='bold', fontsize=10)
+
+    # Plot 2: Cumulative time comparison
+    ax2.plot(baseline_rounds, baseline_cumulative, marker='o', linewidth=2.5, markersize=8,
+             label='FedAvg (Baseline)', color='#1f77b4', alpha=0.8)
+    ax2.plot(adm_rounds, adm_cumulative, marker='s', linewidth=2.5, markersize=8,
+             label='FedAvg + ADM (Proposed)', color='#ff7f0e', alpha=0.8)
+
+    ax2.set_xlabel('Communication Round', fontsize=13, fontweight='bold')
+    ax2.set_ylabel('Cumulative Time (seconds)', fontsize=13, fontweight='bold')
+    ax2.set_title(f'Cumulative Training Time ({dataset})', fontsize=15, fontweight='bold')
+    ax2.legend(fontsize=12, loc='best')
+    ax2.grid(True, alpha=0.3, linestyle='--')
+
+    # Add time savings annotation
+    if len(baseline_cumulative) > 0 and len(adm_cumulative) > 0:
+        baseline_total = baseline_cumulative[-1]
+        adm_total = adm_cumulative[-1]
+        time_saved = baseline_total - adm_total
+        savings_pct = (time_saved / baseline_total) * 100 if baseline_total > 0 else 0
+        
+        ax2.text(len(adm_rounds)*0.5, max(baseline_total, adm_total)*0.5,
+                f'Time Saved: {time_saved:.1f}s ({savings_pct:.1f}%)',
+                bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5),
+                fontsize=12, fontweight='bold', ha='center')
+
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    print(f"📊 Training time comparison saved to {save_path}")
+
+    plt.show()
+
+
 def plot_v_n_evolution(adm_results, save_path='v_n_evolution.png'):
     """Plot v_n values evolution over rounds"""
 
@@ -144,6 +218,8 @@ def print_summary(baseline_results, adm_results):
 
     baseline_acc = baseline_results.get('accuracies', [])
     adm_acc = adm_results.get('accuracies', [])
+    baseline_times = baseline_results.get('round_times', [])
+    adm_times = adm_results.get('round_times', [])
     
     # Print dataset info
     baseline_dataset = baseline_results.get('dataset', 'unknown')
@@ -213,6 +289,21 @@ def print_summary(baseline_results, adm_results):
             speedup = ((baseline_rounds - adm_rounds) / baseline_rounds) * 100
             print(f"  Speedup: {speedup:.1f}% faster")
 
+    # Training time comparison
+    if baseline_times and adm_times:
+        baseline_total = sum(baseline_times)
+        adm_total = sum(adm_times)
+        baseline_avg = np.mean(baseline_times)
+        adm_avg = np.mean(adm_times)
+        
+        print(f"\nTraining Time:")
+        print(f"  FedAvg Total:     {baseline_total:.2f}s")
+        print(f"  FedAvg+ADM Total: {adm_total:.2f}s")
+        print(f"  Time Saved:       {baseline_total - adm_total:.2f}s ({((baseline_total - adm_total)/baseline_total*100):.1f}%)")
+        print(f"\n  FedAvg Avg/Round:     {baseline_avg:.2f}s")
+        print(f"  FedAvg+ADM Avg/Round: {adm_avg:.2f}s")
+        print(f"  Speedup:              {(baseline_avg/adm_avg):.2f}x faster per round")
+
     print("\n" + "="*70)
 
 
@@ -250,6 +341,19 @@ def main():
         )
     else:
         print("\n⚠️  Skipping accuracy comparison plot (missing data)")
+
+    # Plot training time comparison
+    if baseline_results.get('round_times') and adm_results.get('round_times'):
+        dataset = baseline_results.get('dataset', 'unknown')
+        save_path = f'{args.output_dir}/comparison_training_time_{dataset}.png'
+        
+        plot_training_time_comparison(
+            baseline_results,
+            adm_results,
+            save_path=save_path
+        )
+    else:
+        print("\n⚠️  Skipping training time comparison plot (missing data)")
 
     # Plot v_n evolution (only for ADM)
     if adm_results.get('v_n_history'):
