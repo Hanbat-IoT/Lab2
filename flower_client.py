@@ -32,7 +32,6 @@ logging.basicConfig(
 class FlowerClient(fl.client.Client):
     """
     Flower Client Implementation (Flower 0.18.0 API)
-    ADM의 v_n 파라미터에 따라 데이터 사용량을 조절
     """
 
     def __init__(self, client_id: int, dataset: str, data_size: int = 2500):
@@ -159,7 +158,6 @@ class FlowerClient(fl.client.Client):
     def _apply_adm(self, v_n: float):
         """
         Apply ADM Algorithm 1: Data Selection
-        v_n 값에 따라 각 레이블별로 균등하게 데이터를 선택
         """
         v_n = float(round(v_n, 2))
         target_size = int(len(self.full_data) * v_n)
