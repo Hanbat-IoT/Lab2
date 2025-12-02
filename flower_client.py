@@ -31,10 +31,11 @@ logging.basicConfig(
 
 class FlowerClient(fl.client.Client):
 
-    def __init__(self, client_id: int, dataset: str, data_size: int = 2500):
+    def __init__(self, client_id: int, dataset: str, data_size: int = 2500, iid: bool = True):
         self.client_id = client_id
         self.dataset = dataset
         self.data_size = data_size
+        self.iid = iid
 
         # Load model
         self.model = get_model(dataset)
@@ -66,11 +67,13 @@ class FlowerClient(fl.client.Client):
         labels = generator.labels
 
         # Create data loader
+        # IID=True: 모든 클래스 골고루 분포
+        # IID=False: Non-IID, 클라이언트마다 특정 클래스 편향
         loader = utils.Loader(
             argparse.Namespace(
                 dataset=self.dataset,
                 num_clients=1,
-                IID=True,
+                IID=self.iid,  # 명령줄 인자로 제어
                 seed=42
             ),
             generator
@@ -251,6 +254,8 @@ def main():
                        help='Dataset to use')
     parser.add_argument('--data_size', type=int, default=2500,
                        help='Number of training samples per client')
+    parser.add_argument('--iid', type=bool, default=True,
+                       help='IID (True) or Non-IID (False) data distribution')
 
     args = parser.parse_args()
 
@@ -267,7 +272,8 @@ def main():
     client = FlowerClient(
         client_id=args.client_id,
         dataset=args.dataset,
-        data_size=args.data_size
+        data_size=args.data_size,
+        iid=args.iid
     )
 
     # Start client (Flower 0.18.0 API)
