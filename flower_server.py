@@ -57,8 +57,13 @@ class FedAvgADMStrategy(FedAvg):
         self.accuracies = []
         self.v_n_history = []
         self.round_start_time = None
+        
+        # Client performance tracking
+        self.client_training_times = {}  # {client_id: [time1, time2, ...]}
+        self.calibrated = False  # ADM 파라미터 보정 여부
 
         logging.info("Initialized FedAvgADMStrategy with ADM optimization")
+        logging.info("ADM will calibrate based on actual client performance")
 
     def initialize_parameters(self, client_manager):
         """Initialize global model parameters (Flower 0.18.0 API)"""
@@ -108,6 +113,55 @@ class FedAvgADMStrategy(FedAvg):
 
         return config_list
 
+    def _calibrate_adm_parameters(self):
+        """
+        실제 학습 시간을 기반으로 ADM 파라미터 보정
+        """
+        logging.info("\n[ADM Calibration] Adjusting parameters based on actual performance")
+        
+        if not self.client_training_times:
+            logging.warning("No training time data available for calibration")
+            return
+        
+        # 각 클라이언트의 평균 학습 시간 계산
+        avg_times = {}
+        for client_id, times in self.client_training_times.items():
+            avg_times[client_id] = np.mean(times)
+        
+        # 시간 기준으로 정렬 (빠른 순)
+        sorted_clients = sorted(avg_times.items(), key=lambda x: x[1])
+        
+        logging.info("Client performance ranking (fastest to slowest):")
+        for client_id, avg_time in sorted_clients:
+            logging.info(f"  Client {client_id}: {avg_time:.2f}s")
+        
+        # Frequency 역산
+        # 가장 빠른 클라이언트를 3.0 GHz로 설정하고, 시간 비율로 다른 클라이언트 계산
+        fastest_time = sorted_clients[0][1]
+        
+        for client_id, avg_time in sorted_clients:
+            # frequency는 시간에 반비례
+            # 빠른 클라이언트 (짧은 시간) → 높은 frequency
+            relative_speed = fastest_time / avg_time
+            frequency_ghz = 3.0 * relative_speed  # 최대 3.0 GHz
+            frequency_ghz = max(1.0, min(3.5, frequency_ghz))  # 1.0 ~ 3.5 GHz 범위
+            
+            if self.parameters is not None:
+                self.parameters["frequency_n"][client_id] = frequency_ghz * 1e9
+            
+            logging.info(f"  Client {client_id}: Calibrated frequency = {frequency_ghz:.2f} GHz")
+        
+        # ADM 파라미터 업데이트
+        if self.parameters is not None:
+            # 실제 시간 기반으로 t 값도 조정
+            max_time = max(avg_times.values())
+            # t는 가장 느린 클라이언트가 v_n=1.0으로 학습할 수 있는 시간
+            # 여유를 두기 위해 1.2배
+            self.parameters["t"] = max_time * 1.2
+            logging.info(f"  Adjusted t = {self.parameters['t']:.2f}s (based on slowest client)")
+        
+        logging.info("[ADM Calibration] Completed\n")
+
     def _run_adm_optimization(self):
         """ADM 알고리즘 실행"""
         logging.info("\n[ADM Optimization]")
@@ -156,7 +210,7 @@ class FedAvgADMStrategy(FedAvg):
         if not results:
             return None, {}
 
-        # Log client training info
+        # Log client training info and collect performance data
         total_samples = 0
         for _, fit_res in results:
             num_samples = fit_res.num_examples
@@ -164,10 +218,20 @@ class FedAvgADMStrategy(FedAvg):
             client_id = fit_res.metrics.get("client_id", -1)
             total_samples += num_samples
 
+            # Collect training times for calibration
+            if client_id not in self.client_training_times:
+                self.client_training_times[client_id] = []
+            self.client_training_times[client_id].append(training_time)
+
             logging.info(
                 f"Client {client_id}: {num_samples} samples, "
                 f"training time: {training_time:.2f}s"
             )
+        
+        # Calibrate ADM parameters after first round
+        if rnd == 1 and not self.calibrated:
+            self._calibrate_adm_parameters()
+            self.calibrated = True
 
         # Call parent's aggregate_fit
         aggregated_params, metrics = super().aggregate_fit(
@@ -738,7 +802,12 @@ def main():
             num_clients=args.num_clients,
             dataset=args.dataset,
             adm_params=adm_params,
-            min_available_clients=args.num_clients,
+            fraction_fit=1.0,  # 100% 클라이언트 선택
+            fraction_evaluate=1.0,  # 100% 클라이언트 평가
+            min_fit_clients=args.num_clients,  # 최소 N개 필요
+            min_evaluate_clients=args.num_clients,  # 최소 N개 필요
+            min_available_clients=args.num_clients,  # 최소 N개 연결 필요
+            accept_failures=False,  # 실패 허용 안함
         )
         result_file = f"results_{args.strategy}_{args.dataset}_{args.num_clients}clients_{timestamp}.json"
     elif args.strategy == 'fedavg_bwa':
@@ -747,7 +816,12 @@ def main():
             dataset=args.dataset,
             num_rounds=args.num_rounds,
             batch_size_options=[16, 32, 64, 128],
-            min_available_clients=args.num_clients,
+            fraction_fit=1.0,  # 100% 클라이언트 선택
+            fraction_evaluate=1.0,  # 100% 클라이언트 평가
+            min_fit_clients=args.num_clients,  # 최소 N개 필요
+            min_evaluate_clients=args.num_clients,  # 최소 N개 필요
+            min_available_clients=args.num_clients,  # 최소 N개 연결 필요
+            accept_failures=False,  # 실패 허용 안함
         )
         result_file = f"results_{args.strategy}_{args.dataset}_{args.num_clients}clients_{timestamp}.json"
     else:
@@ -755,14 +829,23 @@ def main():
             num_clients=args.num_clients,
             dataset=args.dataset,
             num_rounds=args.num_rounds,
-            min_available_clients=args.num_clients,
+            fraction_fit=1.0,  # 100% 클라이언트 선택
+            fraction_evaluate=1.0,  # 100% 클라이언트 평가
+            min_fit_clients=args.num_clients,  # 최소 N개 필요
+            min_evaluate_clients=args.num_clients,  # 최소 N개 필요
+            min_available_clients=args.num_clients,  # 최소 N개 연결 필요
+            accept_failures=False,  # 실패 허용 안함
         )
         result_file = f"results_{args.strategy}_{args.dataset}_{args.num_clients}clients_{timestamp}.json"
 
     # Start server (Flower 0.18.0 API)
+    # Increase timeout to wait for all clients
     fl.server.start_server(
         server_address=args.server_address,
-        config={"num_rounds": args.num_rounds},
+        config={
+            "num_rounds": args.num_rounds,
+            "round_timeout": 600.0,  # 10분 타임아웃 (느린 클라이언트 대기)
+        },
         strategy=strategy,
     )
 

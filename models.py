@@ -31,8 +31,8 @@ class CNNCifar(nn.Module):
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
-        return F.log_softmax(x, dim=1)
-        # return x
+        return x  # Raw logits for CrossEntropyLoss
+        # return F.log_softmax(x, dim=1)  # 제거!
     
 class CNNMNIST(nn.Module):
     def __init__(self):
@@ -50,4 +50,5 @@ class CNNMNIST(nn.Module):
         x = x.view(-1, 4 * 4 * 50)
         x = F.relu(self.fc1(x))
         x = self.fc2(x)
-        return F.log_softmax(x, dim=1)
+        return x  # Raw logits for CrossEntropyLoss
+        # return F.log_softmax(x, dim=1)  # 제거!
