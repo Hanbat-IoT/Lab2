@@ -803,11 +803,8 @@ def main():
             dataset=args.dataset,
             adm_params=adm_params,
             fraction_fit=1.0,  # 100% 클라이언트 선택
-            fraction_evaluate=1.0,  # 100% 클라이언트 평가
             min_fit_clients=args.num_clients,  # 최소 N개 필요
-            min_evaluate_clients=args.num_clients,  # 최소 N개 필요
             min_available_clients=args.num_clients,  # 최소 N개 연결 필요
-            accept_failures=False,  # 실패 허용 안함
         )
         result_file = f"results_{args.strategy}_{args.dataset}_{args.num_clients}clients_{timestamp}.json"
     elif args.strategy == 'fedavg_bwa':
@@ -817,11 +814,8 @@ def main():
             num_rounds=args.num_rounds,
             batch_size_options=[16, 32, 64, 128],
             fraction_fit=1.0,  # 100% 클라이언트 선택
-            fraction_evaluate=1.0,  # 100% 클라이언트 평가
             min_fit_clients=args.num_clients,  # 최소 N개 필요
-            min_evaluate_clients=args.num_clients,  # 최소 N개 필요
             min_available_clients=args.num_clients,  # 최소 N개 연결 필요
-            accept_failures=False,  # 실패 허용 안함
         )
         result_file = f"results_{args.strategy}_{args.dataset}_{args.num_clients}clients_{timestamp}.json"
     else:
@@ -830,11 +824,8 @@ def main():
             dataset=args.dataset,
             num_rounds=args.num_rounds,
             fraction_fit=1.0,  # 100% 클라이언트 선택
-            fraction_evaluate=1.0,  # 100% 클라이언트 평가
             min_fit_clients=args.num_clients,  # 최소 N개 필요
-            min_evaluate_clients=args.num_clients,  # 최소 N개 필요
             min_available_clients=args.num_clients,  # 최소 N개 연결 필요
-            accept_failures=False,  # 실패 허용 안함
         )
         result_file = f"results_{args.strategy}_{args.dataset}_{args.num_clients}clients_{timestamp}.json"
 
