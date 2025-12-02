@@ -76,19 +76,9 @@ class FedAvgADMStrategy(FedAvg):
     def configure_evaluate(
         self, rnd: int, parameters: Parameters, client_manager
     ) -> List[Tuple[fl.server.client_proxy.ClientProxy, fl.common.EvaluateIns]]:
-        """Configure clients for evaluation - ensure all clients participate"""
-        
-        # Sample all clients
-        clients = client_manager.sample(
-            num_clients=self.num_clients,
-            min_num_clients=self.num_clients
-        )
-        
-        # Configure evaluation for all clients
-        config = {"server_round": rnd}
-        evaluate_ins = fl.common.EvaluateIns(parameters, config)
-        
-        return [(client, evaluate_ins) for client in clients]
+        """Skip client-side evaluation (server evaluates instead)"""
+        # 서버에서 이미 _evaluate_global_model()로 평가하므로 중복 방지
+        return []
 
     def configure_fit(
         self, rnd: int, parameters: Parameters, client_manager
@@ -432,11 +422,9 @@ class FedAvgBaselineStrategy(FedAvg):
             min_num_clients=self.num_clients
         )
         
-        # Configure evaluation for all clients
-        config = {"server_round": rnd}
-        evaluate_ins = fl.common.EvaluateIns(parameters, config)
-        
-        return [(client, evaluate_ins) for client in clients]
+        """Skip client-side evaluation (server evaluates instead)"""
+        # 서버에서 이미 _evaluate_global_model()로 평가하므로 중복 방지
+        return []
 
     def configure_fit(
         self, rnd: int, parameters: Parameters, client_manager
@@ -576,10 +564,9 @@ class FedAvgBWAStrategy(FedAvg):
         )
         
         # Configure evaluation for all clients
-        config = {"server_round": rnd}
-        evaluate_ins = fl.common.EvaluateIns(parameters, config)
-        
-        return [(client, evaluate_ins) for client in clients]
+        """Skip client-side evaluation (server evaluates instead)"""
+        # 서버에서 이미 _evaluate_global_model()로 평가하므로 중복 방지
+        return []
 
     def configure_fit(
         self, rnd: int, parameters: Parameters, client_manager
