@@ -582,12 +582,6 @@ class FedAvgBWAStrategy(FedAvg):
         return [(client, evaluate_ins) for client in clients]
 
     def configure_fit(
-        """Initialize global model parameters"""
-        model = get_model(self.dataset)
-        params = [val.cpu().numpy() for _, val in model.state_dict().items()]
-        return fl.common.weights_to_parameters(params)
-
-    def configure_fit(
         self, rnd: int, parameters: Parameters, client_manager
     ) -> List[Tuple[fl.server.client_proxy.ClientProxy, fl.common.FitIns]]:
         """Configure clients with BWA-optimized batch sizes"""
