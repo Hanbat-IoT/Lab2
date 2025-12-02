@@ -201,7 +201,7 @@ class FlowerClient(fl.client.Client):
         trainloader = DataLoader(data, batch_size=batch_size, shuffle=True)
 
         # Optimizer
-        optimizer = optim.SGD(self.model.parameters(), lr=0.01, momentum=0.9)
+        optimizer = optim.SGD(self.model.parameters(), lr=0.001, momentum=0.9)  # 0.01 → 0.001
         criterion = nn.CrossEntropyLoss()
 
         for epoch in range(epochs):

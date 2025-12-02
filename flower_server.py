@@ -72,6 +72,23 @@ class FedAvgADMStrategy(FedAvg):
         # Convert model to parameters (Flower 0.18.0 uses weights_to_parameters)
         params = [val.cpu().numpy() for _, val in model.state_dict().items()]
         return fl.common.weights_to_parameters(params)
+    
+    def configure_evaluate(
+        self, rnd: int, parameters: Parameters, client_manager
+    ) -> List[Tuple[fl.server.client_proxy.ClientProxy, fl.common.EvaluateIns]]:
+        """Configure clients for evaluation - ensure all clients participate"""
+        
+        # Sample all clients
+        clients = client_manager.sample(
+            num_clients=self.num_clients,
+            min_num_clients=self.num_clients
+        )
+        
+        # Configure evaluation for all clients
+        config = {"server_round": rnd}
+        evaluate_ins = fl.common.EvaluateIns(parameters, config)
+        
+        return [(client, evaluate_ins) for client in clients]
 
     def configure_fit(
         self, rnd: int, parameters: Parameters, client_manager
@@ -101,7 +118,7 @@ class FedAvgADMStrategy(FedAvg):
         for idx, client in enumerate(clients):
             config = {
                 "server_round": rnd,
-                "local_epochs": 5,
+                "local_epochs": 3,  # 5 → 3 (과적합 방지)
                 "batch_size": 32,
                 "v_n": float(self.optimal_v_n[idx]),  # ADM optimized value
                 "client_id": idx
@@ -403,6 +420,23 @@ class FedAvgBaselineStrategy(FedAvg):
         model = get_model(self.dataset)
         params = [val.cpu().numpy() for _, val in model.state_dict().items()]
         return fl.common.weights_to_parameters(params)
+    
+    def configure_evaluate(
+        self, rnd: int, parameters: Parameters, client_manager
+    ) -> List[Tuple[fl.server.client_proxy.ClientProxy, fl.common.EvaluateIns]]:
+        """Configure clients for evaluation - ensure all clients participate"""
+        
+        # Sample all clients
+        clients = client_manager.sample(
+            num_clients=self.num_clients,
+            min_num_clients=self.num_clients
+        )
+        
+        # Configure evaluation for all clients
+        config = {"server_round": rnd}
+        evaluate_ins = fl.common.EvaluateIns(parameters, config)
+        
+        return [(client, evaluate_ins) for client in clients]
 
     def configure_fit(
         self, rnd: int, parameters: Parameters, client_manager
@@ -424,7 +458,7 @@ class FedAvgBaselineStrategy(FedAvg):
         for idx, client in enumerate(clients):
             config = {
                 "server_round": rnd,
-                "local_epochs": 5,
+                "local_epochs": 3,  # 5 → 3 (과적합 방지)
                 "batch_size": 32,
                 "v_n": 1.0,  # Always use full data
                 "client_id": idx
@@ -529,6 +563,29 @@ class FedAvgBWAStrategy(FedAvg):
         model = get_model(self.dataset)
         params = [val.cpu().numpy() for _, val in model.state_dict().items()]
         return fl.common.weights_to_parameters(params)
+    
+    def configure_evaluate(
+        self, rnd: int, parameters: Parameters, client_manager
+    ) -> List[Tuple[fl.server.client_proxy.ClientProxy, fl.common.EvaluateIns]]:
+        """Configure clients for evaluation - ensure all clients participate"""
+        
+        # Sample all clients
+        clients = client_manager.sample(
+            num_clients=self.num_clients,
+            min_num_clients=self.num_clients
+        )
+        
+        # Configure evaluation for all clients
+        config = {"server_round": rnd}
+        evaluate_ins = fl.common.EvaluateIns(parameters, config)
+        
+        return [(client, evaluate_ins) for client in clients]
+
+    def configure_fit(
+        """Initialize global model parameters"""
+        model = get_model(self.dataset)
+        params = [val.cpu().numpy() for _, val in model.state_dict().items()]
+        return fl.common.weights_to_parameters(params)
 
     def configure_fit(
         self, rnd: int, parameters: Parameters, client_manager
@@ -575,7 +632,7 @@ class FedAvgBWAStrategy(FedAvg):
         for idx, client in enumerate(clients):
             config = {
                 "server_round": rnd,
-                "local_epochs": 5,
+                "local_epochs": 3,  # 5 → 3 (과적합 방지)
                 "batch_size": batch_size,  # BWA optimized
                 "v_n": 1.0,
                 "client_id": idx
