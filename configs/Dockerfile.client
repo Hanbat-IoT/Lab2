@@ -1,0 +1,21 @@
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Install PyTorch CPU version first
+RUN pip install --no-cache-dir \
+    torch torchvision --index-url https://download.pytorch.org/whl/cpu
+
+# Install other dependencies from PyPI
+RUN pip install --no-cache-dir \
+    flwr==0.18.0 \
+    numpy \
+    cvxpy \
+    matplotlib \
+    pandas \
+    tqdm \
+    psutil
+
+COPY flower_client.py models.py utils.py updateModel.py dists.py ./
+
+CMD ["python", "flower_client.py"]

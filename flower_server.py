@@ -60,10 +60,9 @@ class FedAvgADMStrategy(FedAvg):
         
         # Client performance tracking
         self.client_training_times = {}  # {client_id: [time1, time2, ...]}
-        self.calibrated = False  # ADM 파라미터 보정 여부
 
         logging.info("Initialized FedAvgADMStrategy with ADM optimization")
-        logging.info("ADM will calibrate based on actual client performance")
+        logging.info("ADM will calibrate dynamically every round based on actual client performance")
 
     def initialize_parameters(self, client_manager):
         """Initialize global model parameters (Flower 0.18.0 API)"""
@@ -122,51 +121,59 @@ class FedAvgADMStrategy(FedAvg):
 
     def _calibrate_adm_parameters(self):
         """
-        실제 학습 시간을 기반으로 ADM 파라미터 보정
+        실제 학습 시간을 기반으로 ADM 파라미터 동적 보정
+        매 라운드마다 최근 학습 시간만 사용하여 실시간 성능 변화 반영
         """
         logging.info("\n[ADM Calibration] Adjusting parameters based on actual performance")
-        
+
         if not self.client_training_times:
             logging.warning("No training time data available for calibration")
             return
-        
-        # 각 클라이언트의 평균 학습 시간 계산
-        avg_times = {}
+
+        # 각 클라이언트의 최근 학습 시간 사용 (마지막 값만)
+        # 동적 환경 변화를 빠르게 반영하기 위함
+        current_times = {}
         for client_id, times in self.client_training_times.items():
-            avg_times[client_id] = np.mean(times)
-        
+            if times:
+                # 최근 1개 라운드의 시간만 사용 (즉시 반영)
+                current_times[client_id] = times[-1]
+
+        if not current_times:
+            logging.warning("No current training time data")
+            return
+
         # 시간 기준으로 정렬 (빠른 순)
-        sorted_clients = sorted(avg_times.items(), key=lambda x: x[1])
-        
-        logging.info("Client performance ranking (fastest to slowest):")
-        for client_id, avg_time in sorted_clients:
-            logging.info(f"  Client {client_id}: {avg_time:.2f}s")
-        
+        sorted_clients = sorted(current_times.items(), key=lambda x: x[1])
+
+        logging.info("Client performance (current round):")
+        for client_id, current_time in sorted_clients:
+            logging.info(f"  Client {client_id}: {current_time:.2f}s")
+
         # Frequency 역산
         # 가장 빠른 클라이언트를 3.0 GHz로 설정하고, 시간 비율로 다른 클라이언트 계산
         fastest_time = sorted_clients[0][1]
-        
-        for client_id, avg_time in sorted_clients:
+
+        for client_id, current_time in sorted_clients:
             # frequency는 시간에 반비례
             # 빠른 클라이언트 (짧은 시간) → 높은 frequency
-            relative_speed = fastest_time / avg_time
+            relative_speed = fastest_time / current_time
             frequency_ghz = 3.0 * relative_speed  # 최대 3.0 GHz
             frequency_ghz = max(1.0, min(3.5, frequency_ghz))  # 1.0 ~ 3.5 GHz 범위
-            
+
             if self.parameters is not None:
                 self.parameters["frequency_n"][client_id] = frequency_ghz * 1e9
-            
+
             logging.info(f"  Client {client_id}: Calibrated frequency = {frequency_ghz:.2f} GHz")
-        
+
         # ADM 파라미터 업데이트
         if self.parameters is not None:
             # 실제 시간 기반으로 t 값도 조정
-            max_time = max(avg_times.values())
+            max_time = max(current_times.values())
             # t는 가장 느린 클라이언트가 v_n=1.0으로 학습할 수 있는 시간
             # 여유를 두기 위해 1.2배
             self.parameters["t"] = max_time * 1.2
             logging.info(f"  Adjusted t = {self.parameters['t']:.2f}s (based on slowest client)")
-        
+
         logging.info("[ADM Calibration] Completed\n")
 
     def _run_adm_optimization(self):
@@ -235,10 +242,9 @@ class FedAvgADMStrategy(FedAvg):
                 f"training time: {training_time:.2f}s"
             )
         
-        # Calibrate ADM parameters after first round
-        if rnd == 1 and not self.calibrated:
-            self._calibrate_adm_parameters()
-            self.calibrated = True
+        # Calibrate ADM parameters dynamically every round
+        # 매 라운드마다 실제 학습 시간을 측정하여 frequency와 v_n을 동적으로 조정
+        self._calibrate_adm_parameters()
 
         # Call parent's aggregate_fit
         aggregated_params, metrics = super().aggregate_fit(

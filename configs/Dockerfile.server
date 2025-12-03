@@ -1,0 +1,32 @@
+# Federated Learning Server
+# Full PyTorch with CUDA support for laptop/desktop
+
+FROM pytorch/pytorch:1.10.0-cuda11.3-cudnn8-runtime
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+RUN pip install --no-cache-dir \
+    flwr==0.18.0 \
+    numpy \
+    cvxpy \
+    scs \
+    ecos \
+    matplotlib \
+    pandas \
+    tqdm \
+    psutil
+
+# Copy application files
+COPY flower_server.py models.py utils.py ADM.py BWA.py updateModel.py dists.py ./
+
+# Expose Flower server port
+EXPOSE 8080
+
+# Default command
+CMD ["python", "flower_server.py", "--num_clients", "2", "--num_rounds", "10", "--dataset", "mnist", "--strategy", "fedavg"]
