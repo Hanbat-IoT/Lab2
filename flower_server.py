@@ -60,6 +60,10 @@ class FedAvgADMStrategy(FedAvg):
         
         # Client performance tracking
         self.client_training_times = {}  # {client_id: [time1, time2, ...]}
+        
+        # Client ID mapping (cid -> assigned_id)
+        self.client_id_map = {}  # {cid: 0, 1, 2, ...}
+        self.next_client_id = 0
 
         logging.info("Initialized FedAvgADMStrategy with ADM optimization")
         logging.info("ADM will calibrate dynamically every round based on actual client performance")
@@ -86,7 +90,7 @@ class FedAvgADMStrategy(FedAvg):
         라운드 시작 시 호출: ADM 최적화 수행 및 클라이언트 설정 (Flower 0.18.0 API)
         """
         self.current_round = rnd - 1  # 0-indexed
-        self.round_start_time = time.time()  # 라운드 시작 시간 기록
+        self.round_start_time = time.time()  # 라운드 시간 기록
 
         logging.info(f"\n{'='*60}")
         logging.info(f"Round {rnd}/{self.adm_params['rounds']}")
@@ -108,19 +112,38 @@ class FedAvgADMStrategy(FedAvg):
         )
 
         # Configure each client with its specific v_n
+        # Get client_id from client properties (passed via --client_id argument)
         config_list = []
-        for idx, client in enumerate(clients):
+        for client in clients:
+            # Try to get client_id from client properties
+            try:
+                # Request client properties to get the actual client_id
+                props_ins = fl.common.GetPropertiesIns(config={})
+                props_res = client.get_properties(props_ins, timeout=5)
+                client_id = int(props_res.properties.get("client_id", -1))
+                
+                # Map cid to client_id for consistency
+                if client.cid not in self.client_id_map:
+                    self.client_id_map[client.cid] = client_id
+            except Exception as e:
+                # Fallback: use sequential assignment
+                if client.cid not in self.client_id_map:
+                    self.client_id_map[client.cid] = self.next_client_id
+                    self.next_client_id += 1
+                client_id = self.client_id_map[client.cid]
+                logging.warning(f"Could not get client properties, using assigned ID {client_id}")
+            
             config = {
                 "server_round": rnd,
                 "local_epochs": 3,  # 5 → 3 (과적합 방지)
                 "batch_size": 32,
-                "v_n": float(self.optimal_v_n[idx]),  # ADM optimized value
-                "client_id": idx
+                "v_n": float(self.optimal_v_n[client_id]),  # client_id 기준
+                "client_id": client_id
             }
             fit_ins = fl.common.FitIns(parameters, config)
             config_list.append((client, fit_ins))
 
-            logging.info(f"Client {idx}: v_n = {self.optimal_v_n[idx]:.3f}")
+            logging.info(f"Client {client_id} (cid={client.cid}): v_n = {self.optimal_v_n[client_id]:.3f}")
 
         return config_list
 
@@ -150,13 +173,20 @@ class FedAvgADMStrategy(FedAvg):
         # 시간 기준으로 정렬 (빠른 순)
         sorted_clients = sorted(current_times.items(), key=lambda x: x[1])
 
-        logging.info("Client performance (current round):")
+        logging.info("Client performance (current round, sorted by speed):")
         for client_id, current_time in sorted_clients:
             logging.info(f"  Client {client_id}: {current_time:.2f}s")
 
         # Frequency 역산
         # 가장 빠른 클라이언트를 3.0 GHz로 설정하고, 시간 비율로 다른 클라이언트 계산
         fastest_time = sorted_clients[0][1]
+        fastest_client_id = sorted_clients[0][0]
+        slowest_time = sorted_clients[-1][1]
+        slowest_client_id = sorted_clients[-1][0]
+
+        logging.info(f"\nFastest: Client {fastest_client_id} ({fastest_time:.2f}s)")
+        logging.info(f"Slowest: Client {slowest_client_id} ({slowest_time:.2f}s)")
+        logging.info(f"Speed ratio: {slowest_time/fastest_time:.2f}x\n")
 
         for client_id, current_time in sorted_clients:
             # frequency는 시간에 반비례
@@ -166,9 +196,9 @@ class FedAvgADMStrategy(FedAvg):
             frequency_ghz = max(1.0, min(3.5, frequency_ghz))  # 1.0 ~ 3.5 GHz 범위
 
             if self.parameters is not None:
+                old_freq = self.parameters["frequency_n"][client_id] / 1e9
                 self.parameters["frequency_n"][client_id] = frequency_ghz * 1e9
-
-            logging.info(f"  Client {client_id}: Calibrated frequency = {frequency_ghz:.2f} GHz")
+                logging.info(f"  Client {client_id}: {old_freq:.2f} GHz → {frequency_ghz:.2f} GHz (time: {current_time:.2f}s)")
 
         # ADM 파라미터 업데이트
         if self.parameters is not None:
@@ -176,8 +206,9 @@ class FedAvgADMStrategy(FedAvg):
             max_time = max(current_times.values())
             # t는 가장 느린 클라이언트가 v_n=1.0으로 학습할 수 있는 시간
             # 여유를 두기 위해 1.2배
+            old_t = self.parameters["t"]
             self.parameters["t"] = max_time * 1.2
-            logging.info(f"  Adjusted t = {self.parameters['t']:.2f}s (based on slowest client)")
+            logging.info(f"\n  Adjusted t: {old_t:.2f}s → {self.parameters['t']:.2f}s (based on slowest client)")
 
         logging.info("[ADM Calibration] Completed\n")
 
@@ -231,6 +262,7 @@ class FedAvgADMStrategy(FedAvg):
 
         # Log client training info and collect performance data
         total_samples = 0
+        logging.info("\n[Training Results]")
         for _, fit_res in results:
             num_samples = fit_res.num_examples
             training_time = fit_res.metrics.get("training_time", 0)
@@ -242,9 +274,11 @@ class FedAvgADMStrategy(FedAvg):
                 self.client_training_times[client_id] = []
             self.client_training_times[client_id].append(training_time)
 
+            # 현재 할당된 v_n 값도 함께 출력
+            current_v_n = self.optimal_v_n[client_id] if client_id < len(self.optimal_v_n) else "N/A"
             logging.info(
-                f"Client {client_id}: {num_samples} samples, "
-                f"training time: {training_time:.2f}s"
+                f"  Client {client_id}: {num_samples} samples, "
+                f"training time: {training_time:.2f}s, v_n: {current_v_n:.3f}"
             )
 
         # Training times collected - will be used in next round's configure_fit
@@ -357,6 +391,10 @@ class FedAvgBaselineStrategy(FedAvg):
         self.accuracies = []
         self.round_times = []
         self.round_start_time = None
+        
+        # Client ID mapping
+        self.client_id_map = {}
+        self.next_client_id = 0
 
         logging.info("Initialized FedAvg Baseline Strategy (no ADM)")
     
@@ -453,13 +491,27 @@ class FedAvgBaselineStrategy(FedAvg):
         )
 
         config_list = []
-        for idx, client in enumerate(clients):
+        for client in clients:
+            # Try to get client_id from client properties
+            try:
+                props_ins = fl.common.GetPropertiesIns(config={})
+                props_res = client.get_properties(props_ins, timeout=5)
+                client_id = int(props_res.properties.get("client_id", -1))
+                
+                if client.cid not in self.client_id_map:
+                    self.client_id_map[client.cid] = client_id
+            except Exception as e:
+                if client.cid not in self.client_id_map:
+                    self.client_id_map[client.cid] = self.next_client_id
+                    self.next_client_id += 1
+                client_id = self.client_id_map[client.cid]
+            
             config = {
                 "server_round": rnd,
                 "local_epochs": 3,  # 5 → 3 (과적합 방지)
                 "batch_size": 32,
                 "v_n": 1.0,  # Always use full data
-                "client_id": idx
+                "client_id": client_id
             }
             fit_ins = fl.common.FitIns(parameters, config)
             config_list.append((client, fit_ins))
@@ -538,6 +590,10 @@ class FedAvgBWAStrategy(FedAvg):
         # Previous metrics for reward calculation
         self.prev_loss = None
         self.prev_accuracy = None
+        
+        # Client ID mapping
+        self.client_id_map = {}
+        self.next_client_id = 0
         
         # Initialize BWA algorithm
         # State dimension: [loss, accuracy, round_time] + [data_dist per client]
@@ -620,13 +676,27 @@ class FedAvgBWAStrategy(FedAvg):
         
         # Configure each client with BWA-optimized batch size
         config_list = []
-        for idx, client in enumerate(clients):
+        for client in clients:
+            # Try to get client_id from client properties
+            try:
+                props_ins = fl.common.GetPropertiesIns(config={})
+                props_res = client.get_properties(props_ins, timeout=5)
+                client_id = int(props_res.properties.get("client_id", -1))
+                
+                if client.cid not in self.client_id_map:
+                    self.client_id_map[client.cid] = client_id
+            except Exception as e:
+                if client.cid not in self.client_id_map:
+                    self.client_id_map[client.cid] = self.next_client_id
+                    self.next_client_id += 1
+                client_id = self.client_id_map[client.cid]
+            
             config = {
                 "server_round": rnd,
                 "local_epochs": 3,  # 5 → 3 (과적합 방지)
                 "batch_size": batch_size,  # BWA optimized
                 "v_n": 1.0,
-                "client_id": idx
+                "client_id": client_id
             }
             fit_ins = fl.common.FitIns(parameters, config)
             config_list.append((client, fit_ins))
@@ -829,7 +899,7 @@ def main():
         'D_n': [2500 for _ in range(args.num_clients)],  # 클라이언트당 데이터 수
         'Gamma': 0.4,  # v_n 최소값
         'local_iter': 3,  # 실제 local_epochs
-        'c_n': 30000000,  # CPU cycles per sample (30M cycles) - 실제 PyTorch 연산량 반영
+        'c_n': 10000000,  # CPU cycles per sample (10M cycles) - 실제 측정 기반 조정
         'frequency_n_GHz': [1.5, 2.0, 2.5, 3.0],  # 초기 추정치 (calibration으로 업데이트됨)
         'weight_size_n_kbit': 100,  # 모델 크기
         'number_of_clients': args.num_clients,
