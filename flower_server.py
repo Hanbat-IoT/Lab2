@@ -92,7 +92,12 @@ class FedAvgADMStrategy(FedAvg):
         logging.info(f"Round {rnd}/{self.adm_params['rounds']}")
         logging.info(f"{'='*60}")
 
-        # ADM configuration
+        # Calibrate first (if previous round data exists), then optimize
+        # Round 2+: 이전 라운드 학습 시간 기반으로 frequency 업데이트
+        if rnd > 1 and self.client_training_times:
+            self._calibrate_adm_parameters()
+
+        # ADM configuration with updated frequency
         self._run_adm_optimization()
 
         # Get all available clients
@@ -241,10 +246,9 @@ class FedAvgADMStrategy(FedAvg):
                 f"Client {client_id}: {num_samples} samples, "
                 f"training time: {training_time:.2f}s"
             )
-        
-        # Calibrate ADM parameters dynamically every round
-        # 매 라운드마다 실제 학습 시간을 측정하여 frequency와 v_n을 동적으로 조정
-        self._calibrate_adm_parameters()
+
+        # Training times collected - will be used in next round's configure_fit
+        # Calibration happens in configure_fit (before ADM optimization)
 
         # Call parent's aggregate_fit
         aggregated_params, metrics = super().aggregate_fit(
