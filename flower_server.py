@@ -823,20 +823,21 @@ def main():
     print("=" * 70)
 
     # ADM parameters (for FedAvg+ADM strategy)
+    # 실제 측정된 학습 시간 기반으로 보정된 파라미터
     adm_params = {
         'sigma': 0.9 * 1e-8,
-        'D_n': [2500 for _ in range(args.num_clients)],
-        'Gamma': 0.4,
-        'local_iter': 10,
-        'c_n': 30,
-        'frequency_n_GHz': [1.5, 2.0, 2.5, 3.0],  # Heterogeneous devices
-        'weight_size_n_kbit': 100,
+        'D_n': [2500 for _ in range(args.num_clients)],  # 클라이언트당 데이터 수
+        'Gamma': 0.4,  # v_n 최소값
+        'local_iter': 3,  # 실제 local_epochs
+        'c_n': 30000000,  # CPU cycles per sample (30M cycles) - 실제 PyTorch 연산량 반영
+        'frequency_n_GHz': [1.5, 2.0, 2.5, 3.0],  # 초기 추정치 (calibration으로 업데이트됨)
+        'weight_size_n_kbit': 100,  # 모델 크기
         'number_of_clients': args.num_clients,
-        'bandwidth_MHz': 10,
+        'bandwidth_MHz': 10,  # 대역폭
         'channel_gain_n': 1,
         'transmission_power_n': [0.5, 1.0],
         'noise_W': 10**(-114/10) * 1e-3,
-        't': 0.006,
+        't': 60,  # 초기 시간 제약 60초 (calibration으로 자동 조정됨)
         'rounds': args.num_rounds
     }
 
