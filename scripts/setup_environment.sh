@@ -11,10 +11,7 @@ python_version=$(python3 --version 2>&1 | awk '{print $2}')
 echo "Python version: $python_version"
 
 # Detect device type
-if [ -f "/etc/nv_tegra_release" ]; then
-    DEVICE="jetson"
-    echo "Device: NVIDIA Jetson"
-elif grep -q "Raspberry Pi" /proc/cpuinfo 2>/dev/null; then
+if grep -q "Raspberry Pi" /proc/cpuinfo 2>/dev/null; then
     DEVICE="raspberry_pi"
     echo "Device: Raspberry Pi"
 else
@@ -37,12 +34,7 @@ pip install --upgrade pip
 echo ""
 echo "Installing dependencies..."
 
-if [ "$DEVICE" = "jetson" ]; then
-    echo "Installing for Jetson Nano (with CUDA support)..."
-    # PyTorch for Jetson (pre-built wheel)
-    pip install torch torchvision --index-url https://developer.download.nvidia.com/compute/redist/jp/v50
-
-elif [ "$DEVICE" = "raspberry_pi" ]; then
+if [ "$DEVICE" = "raspberry_pi" ]; then
     echo "Installing for Raspberry Pi (CPU only)..."
     # Lightweight versions for Raspberry Pi
     pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu

@@ -1,7 +1,5 @@
 import logging
 import torch
-import torch.nn as nn
-import torch.optim as optim
 import updateModel
 from ADM import *
 
@@ -113,13 +111,6 @@ class Client(object):
         self.model = model
         self.optimizer = torch.optim.SGD(model.parameters(), lr=self.config.lr, momentum=0.5)
 
-    # IID
-    def configure_manual(self, config, model):
-        self.config = config
-        self.epochs = self.config.local_ep
-        self.batch_size = 16
-        self.model = model
-        self.optimizer = torch.optim.SGD(model.parameters(), lr=self.config.lr, momentum=0.5)
 
     def train(self):
         # logging.info('Training on client #{} / batch_size {}'.format(self.client_id, self.batch_size))

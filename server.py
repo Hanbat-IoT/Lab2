@@ -1,11 +1,9 @@
 import torch
 import logging
-import time
 import utils
 import random
 from models import *
 from ADM import *
-import threading
 import client
 import copy
 import updateModel
@@ -87,21 +85,13 @@ class Server(object):
                     self.loader.create_shards()
                     [self.set_client_data(client) for client in clients]
                 else :
-                    # [self.set_client_data(client, number_of_sample=1000) for client in clients[:10]]
-                    # [self.set_client_data(client, number_of_sample=3000) for client in clients[10:]]
                     [self.set_client_data(client, number_of_sample=self.config.local_dataset) for client in clients]
             else:
                 if self.config.loader == "shard":
                     m = max(int(self.config.IID_ratio * self.config.num_clients), 1)
-                    # IID_clients = [client for client in random.sample(
-                    #     clients, m)]
                     IID_clients = [client for client in clients[:m]]
                     Non_clients = set(clients) - set(IID_clients)
-                    # print(len(IID_clients))
-                    # print(len(Non_clients))
                     self.loader.hybird_shards(len(IID_clients), self.config.shard)
-                    # [self.set_client_IID(client) for client in clients[:int(num_clients/2)]]
-                    # [self.set_client_Non_IID(client) for client in clients[int(num_clients/2):]]
                     [self.set_client_IID(client) for client in IID_clients]
                     [self.set_client_Non_IID(client) for client in Non_clients]
 
@@ -130,8 +120,6 @@ class Server(object):
 
         else: # IID
             data = self.loader.get_partition(number_of_sample)
-            # print(data[0])
-            # exit()
 
         # Send data to client
         client.set_data(data)
@@ -150,22 +138,20 @@ class Server(object):
 
     def run(self, round=0):
         rounds = self.config.rounds
-        target_accuracy = self.config.target_accuracy
-        
+
         logging.info('**** Round {}/{} ****'.format(round+1, rounds))
-        accuracy = self.fl_round(round)
+        self.fl_round(round)
     
     def fl_round(self, curr_round):
-        start_time_epochs = time.time()
         sample_clients = self.selection()
         self.configuration(sample_clients)
         self.adm_configuration(sample_clients)
-        
-        
+
+
         # ADM Algorithm 1
-        self.optimal_v_n, sol_list, optimal_t = block_coordinate_descent(self.parameters,
+        self.optimal_v_n, _, optimal_t = block_coordinate_descent(self.parameters,
                                                                     curr_round,
-                                                                    self.parameters["t"]) # sol_list는 objective function 값
+                                                                    self.parameters["t"])
         
         self.parameters["t"] = optimal_t
 
@@ -176,11 +162,7 @@ class Server(object):
 
         for client in sample_clients:
             client.adm_algorithm_1(self.optimal_v_n[client.client_id])
-            # if client.client_id == 0 or client.client_id == 10:
-                # client.pt_data_distribution(self.file_logger)
             client.train()
-        # logging.info("D_n: {}".format(self.parameters["D_n"]))
-        
 
         for client in sample_clients:
             client.train()
@@ -206,16 +188,12 @@ class Server(object):
 
     def selection(self):
         m = max(int(self.config.frac * self.config.num_clients), 1)
-        # sample_clients = [client for client in random.sample(
-        #     self.clients, m)]
         sample_clients = [client for client in self.clients[:m]]
-        
+
         return sample_clients
     
     def adm_configuration(self, sample_clients):
         curr_number_sample = []
-        # number_sample_list=[1000 for _ in range(10)]
-        # number_sample_list.extend([3000 for _ in range(10)])
         for client in sample_clients:
             curr_number_sample.append(len(client.data))
         constant_parameters = {
@@ -233,25 +211,18 @@ class Server(object):
             # Heterogeneous environment: different transmission powers
             'transmission_power_n' : [0.5, 1.0],  # 이질적 환경
             'noise_W': 10**(-114/10) * 1e-3,  # -114 dBm (논문 값)
-            # 't':500}
             't': 0.006  # 6ms time constraint (comm_time 고려)
             }
-        
+
         self.parameters=init_param_hetero(constant_parameters, self.config.num_clients, constant_parameters["t"])
-        # logging.info("D_n: {}".format(curr_number_sample))
         
 
     def configuration(self, sample_clients):
         hybrid = self.config.hybrid
         if hybrid :
-            # 로컬을 다 뽑는 경우에만 해당
             for client in sample_clients:
                 config = self.config
                 client.configure(config, model=copy.deepcopy(self.model))
-                # if client.client_id <= 9: # IID
-                #     client.configure_manual(config, model=copy.deepcopy(self.model))
-                # else:
-                #     client.configure(config, model=copy.deepcopy(self.model))
 
         else :
             for client in sample_clients:
@@ -278,8 +249,6 @@ class Server(object):
                 # Calculate update
                 delta = weight - baseline
                 update.append((name, delta))
-            # print(update)
-            # exit(1)
             updates.append(update)
         return updates
 
@@ -288,11 +257,6 @@ class Server(object):
         return self.fedavg(reports)
     
     def fedavg(self,reports):
-        # num = int((self.config.num_clients / 2))
-        # contri_action = [self.config.contri / num] * num
-        # contri_action_non = [(1 - self.config.contri) / num] * num
-        # contri_action.extend(contri_action_non)
-        
         updates = self.extract_client_updates(reports)
 
         # Extract total number of samples
@@ -302,15 +266,10 @@ class Server(object):
         avg_update = [torch.zeros(x.size()) for _, x in updates[0]]
         for i, update in enumerate(updates):
             num_samples = reports[i].num_samples
-            # if i >= 10:
-            #     break
-            # contri = contri_action[reports[i].client_id]
-            # logging.info("기여도: {}".format(num_samples / total_samples))
 
             for j, (_, delta) in enumerate(update):
                 # Use weighted average by number of samples
                 avg_update[j] += delta * (num_samples / total_samples)
-                # avg_update[j] += delta * contri
 
         # Extract baseline model weights
         baseline_weights = updateModel.extract_weights(self.model)

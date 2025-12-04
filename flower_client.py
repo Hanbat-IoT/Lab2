@@ -9,7 +9,7 @@ import flwr as fl
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader, Subset
+from torch.utils.data import DataLoader
 import argparse
 import logging
 import time

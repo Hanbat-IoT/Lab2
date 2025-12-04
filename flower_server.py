@@ -8,7 +8,7 @@ FedAvg vs FedAvg+ADM 비교 실험
 import flwr as fl
 from flwr.common import Parameters, FitRes, Scalar
 from flwr.server.strategy import FedAvg
-from typing import List, Tuple, Dict, Optional, Union
+from typing import List, Tuple, Dict, Optional
 import numpy as np
 import torch
 import logging

@@ -2,9 +2,6 @@ import math
 import cvxpy as cp
 import numpy as np
 import random
-import matplotlib.pyplot as plt
-from tqdm import tqdm
-import pandas as pd
 
 def init_param_hetero(constant, n, t):
     parameters = {'sigma' : constant['sigma'], 'D_n': np.empty(n), 'Gamma': constant['Gamma'], 'local_iter': np.empty(n), 'c_n': np.empty(n),

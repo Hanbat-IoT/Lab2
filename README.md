@@ -10,8 +10,7 @@ FL_GUI/
 │   └── FLOWER_GUIDE.md            # Flower 네트워크 FL 가이드
 │
 ├── configs/                        # ⚙️ 설정 파일
-│   ├── requirements.txt           # Python 의존성
-│   └── Dockerfile.jetson          # Jetson Nano용 Docker 설정
+│   └── requirements.txt           # Python 의존성
 │
 ├── scripts/                        # 🔧 유틸리티 스크립트
 │   ├── check_versions.py          # 버전 확인
@@ -72,7 +71,7 @@ Configs:
   - configs/requirements.txt
 ```
 
-### 클라이언트 (Jetson Nano, Raspberry Pi)
+### 클라이언트
 ```
 Core Files:
   - flower_client.py ⭐
