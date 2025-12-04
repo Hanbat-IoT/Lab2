@@ -91,6 +91,14 @@ class FlowerClient(fl.client.Client):
     def get_parameters(self):
         """Return model parameters (Flower 0.18.0 API - no config parameter)"""
         return [val.cpu().numpy() for _, val in self.model.state_dict().items()]
+    
+    def get_properties(self, ins):
+        """Return client properties including client_id (Flower 0.18.0 API)"""
+        return {
+            "client_id": str(self.client_id),
+            "dataset": self.dataset,
+            "data_size": len(self.data)
+        }
 
     def set_parameters(self, parameters):
         """Set model parameters (Flower 0.18.0 API)"""
