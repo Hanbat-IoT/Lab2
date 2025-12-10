@@ -69,19 +69,44 @@ class FlowerClient(fl.client.Client):
         # Create data loader
         # IID=True: 모든 클래스 골고루 분포
         # IID=False: Non-IID, 클라이언트마다 특정 클래스 편향
-        loader = utils.Loader(
-            argparse.Namespace(
-                dataset=self.dataset,
-                num_clients=1,
-                IID=self.iid,  # 명령줄 인자로 제어
-                seed=42
-            ),
-            generator
-        )
-
-        # Get partition for this client
-        self.data = loader.get_partition(self.data_size)
+        
+        if self.iid:
+            # IID: 균등 분포 (모든 클래스 골고루)
+            loader = utils.Loader(
+                argparse.Namespace(
+                    dataset=self.dataset,
+                    num_clients=1,
+                    IID=True,
+                    seed=42 + self.client_id  # 클라이언트별 다른 시드
+                ),
+                generator
+            )
+            self.data = loader.get_partition(self.data_size)
+            logging.info(f"Using IID data distribution")
+        else:
+            # Non-IID: 클라이언트별로 특정 클래스에 편향
+            loader = utils.BiasLoader(
+                argparse.Namespace(
+                    dataset=self.dataset,
+                    num_clients=1,
+                    IID=False,
+                    seed=42 + self.client_id
+                ),
+                generator
+            )
+            # 클라이언트 ID 기반 선호 클래스 설정
+            num_classes = len(labels)
+            pref = [self.client_id % num_classes, (self.client_id + 1) % num_classes]
+            bias = 0.7  # 70% 선호 클래스, 30% 나머지
+            self.data = loader.get_partition(self.data_size, pref, bias)
+            logging.info(f"Using Non-IID data distribution (prefer classes {pref}, bias={bias})")
+        
         self.full_data = self.data.copy()  # Keep full dataset
+        
+        # Log data distribution
+        from collections import Counter
+        label_dist = Counter([item[1] for item in self.data])
+        logging.info(f"Label distribution: {sorted(label_dist.items())}")
 
         # Test set
         self.testset = loader.get_testset()
