@@ -1,15 +1,14 @@
-import matplotlib.pyplot as plt
-from flask import Flask, render_template, request, redirect, url_for, jsonify, session
+from flask import Flask, render_template, request, jsonify, session
 import run_app
 import os
 import re
+import pandas as pd
 
 app = Flask(__name__, template_folder='templates')
 app.secret_key = 'your_secret_key'  # 세션을 위한 비밀 키 설정
 
 @app.route('/')
 def index():
-    # return 'Hello World!'
     return render_template('index.html')
 
 @app.route('/start-training', methods=['POST'])
@@ -23,7 +22,6 @@ def start_training():
         "data_distribution": request.form.get('data_distribution')
     }
 
-    # file_logger, log_file_path = run_app.file_generate()
     fl_server, log_file_path = run_app.server_init(params=params)
     run_app.server_boot(fl_server)
 
@@ -65,12 +63,6 @@ def get_training_progress(log_file_path):
         return "Log file not found"
     except Exception as e:
         return f"Error: {e}"
-
-
-
-
-
-import pandas as pd
 
 @app.route('/result')
 def show_result():

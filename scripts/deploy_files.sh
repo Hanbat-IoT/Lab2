@@ -30,14 +30,6 @@ CLIENT_FILES=(
 )
 
 # 설정: 디바이스 IP 주소 (여기를 수정하세요)
-JETSON1_IP="192.168.0.101"
-JETSON1_USER="jetson"
-JETSON1_PATH="~/fl/"
-
-JETSON2_IP="192.168.0.101"  # Docker는 같은 IP
-JETSON2_USER="jetson"
-JETSON2_PATH="~/fl2/"
-
 RPI_IP="192.168.0.102"
 RPI_USER="pi"
 RPI_PATH="~/fl/"
@@ -71,30 +63,16 @@ deploy_client() {
 # 메뉴
 echo ""
 echo "Select deployment option:"
-echo "  1) Deploy to Jetson Nano #1 (Client 0)"
-echo "  2) Deploy to Jetson Nano #2 (Client 1)"
-echo "  3) Deploy to Raspberry Pi (Client 2)"
-echo "  4) Deploy to ALL clients"
-echo "  5) Check server files (this machine)"
+echo "  1) Deploy to Raspberry Pi"
+echo "  2) Check server files (this machine)"
 echo ""
-read -p "Enter choice [1-5]: " choice
+read -p "Enter choice [1-2]: " choice
 
 case $choice in
     1)
-        deploy_client $JETSON1_IP $JETSON1_USER $JETSON1_PATH "Jetson Nano #1"
+        deploy_client $RPI_IP $RPI_USER $RPI_PATH "Raspberry Pi"
         ;;
     2)
-        deploy_client $JETSON2_IP $JETSON2_USER $JETSON2_PATH "Jetson Nano #2"
-        ;;
-    3)
-        deploy_client $RPI_IP $RPI_USER $RPI_PATH "Raspberry Pi"
-        ;;
-    4)
-        deploy_client $JETSON1_IP $JETSON1_USER $JETSON1_PATH "Jetson Nano #1"
-        deploy_client $JETSON2_IP $JETSON2_USER $JETSON2_PATH "Jetson Nano #2"
-        deploy_client $RPI_IP $RPI_USER $RPI_PATH "Raspberry Pi"
-        ;;
-    5)
         echo ""
         echo "Checking server files on this machine..."
         echo ""
