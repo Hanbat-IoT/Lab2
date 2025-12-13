@@ -1,7 +1,7 @@
 import logging
 import random
 import math
-import dists
+from src import dists
 from torchvision import datasets, transforms
 
 def get_data(dataset):

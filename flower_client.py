@@ -17,9 +17,9 @@ import platform
 import psutil
 from collections import OrderedDict
 
-from models import get_model
-import utils
-import updateModel
+from src.models import get_model
+import src.utils as utils
+import src.updateModel as updateModel
 
 # Setup logging
 logging.basicConfig(
@@ -31,11 +31,12 @@ logging.basicConfig(
 
 class FlowerClient(fl.client.Client):
 
-    def __init__(self, client_id: int, dataset: str, data_size: int = 2500, iid: bool = True):
+    def __init__(self, client_id: int, dataset: str, data_size: int = 2500, iid: bool = True, bias: float = 0.5):
         self.client_id = client_id
         self.dataset = dataset
         self.data_size = data_size
         self.iid = iid
+        self.bias = bias
 
         # Load model
         self.model = get_model(dataset)
@@ -94,12 +95,12 @@ class FlowerClient(fl.client.Client):
                 ),
                 generator
             )
-            # 클라이언트 ID 기반 선호 클래스 설정
+            # 클라이언트 ID 기반 선호 클래스 설정 (단일 클래스)
             num_classes = len(labels)
-            pref = [self.client_id % num_classes, (self.client_id + 1) % num_classes]
-            bias = 0.7  # 70% 선호 클래스, 30% 나머지
-            self.data = loader.get_partition(self.data_size, pref, bias)
-            logging.info(f"Using Non-IID data distribution (prefer classes {pref}, bias={bias})")
+            pref_idx = self.client_id % num_classes
+            pref = labels[pref_idx]  # Convert to label string (e.g., '0', '1', ...)
+            self.data = loader.get_partition(self.data_size, pref, self.bias)
+            logging.info(f"Using Non-IID data distribution (prefer class {pref}, bias={self.bias*100:.0f}%)")
         
         self.full_data = self.data.copy()  # Keep full dataset
         
@@ -287,8 +288,12 @@ def main():
                        help='Dataset to use')
     parser.add_argument('--data_size', type=int, default=2500,
                        help='Number of training samples per client')
-    parser.add_argument('--iid', type=bool, default=True,
-                       help='IID (True) or Non-IID (False) data distribution')
+    parser.add_argument('--iid', action='store_true', default=False,
+                       help='Use IID data distribution (default: Non-IID)')
+    parser.add_argument('--non-iid', dest='iid', action='store_false',
+                       help='Use Non-IID data distribution')
+    parser.add_argument('--bias', type=float, default=0.5,
+                       help='Non-IID bias ratio (0.5=50%%, 1.0=100%%, default: 0.5)')
 
     args = parser.parse_args()
 
@@ -298,6 +303,10 @@ def main():
     print(f"Server: {args.server_address}")
     print(f"Dataset: {args.dataset.upper()}")
     print(f"Data size: {args.data_size}")
+    if args.iid:
+        print(f"Distribution: IID (균등 분포)")
+    else:
+        print(f"Distribution: Non-IID (bias={args.bias*100:.0f}%)")
     print(f"Device: {'GPU' if torch.cuda.is_available() else 'CPU'}")
     print("=" * 70)
 
@@ -306,7 +315,8 @@ def main():
         client_id=args.client_id,
         dataset=args.dataset,
         data_size=args.data_size,
-        iid=args.iid
+        iid=args.iid,
+        bias=args.bias
     )
 
     # Start client (Flower 0.18.0 API)

@@ -15,12 +15,12 @@ import logging
 import argparse
 import json
 from collections import OrderedDict
-from models import get_model
-from ADM import init_param_hetero, block_coordinate_descent
-from BWA import BWAAlgorithm, create_state
+from src.models import get_model
+from src.algorithms.ADM import init_param_hetero, block_coordinate_descent
+from src.algorithms.BWA import BWAAlgorithm, create_state
 import time
-import utils
-import updateModel
+import src.utils as utils
+import src.updateModel as updateModel
 
 # Setup logging
 logging.basicConfig(
@@ -392,8 +392,8 @@ class FedAvgADMStrategy(FedAvg):
     
     def _evaluate_global_model(self, parameters):
         """Evaluate global model on test set"""
-        import utils
-        import updateModel
+        import src.utils as utils
+        import src.updateModel as updateModel
         
         # Load test data
         generator = utils.get_data(self.dataset)
@@ -964,6 +964,10 @@ def main():
     print("\nWaiting for clients to connect...")
     print("=" * 70)
 
+    # Create logs directory if it doesn't exist
+    import os
+    os.makedirs('logs', exist_ok=True)
+
     # ADM parameters (for FedAvg+ADM strategy)
     # 실제 측정된 학습 시간 기반으로 보정된 파라미터
     adm_params = {
@@ -997,7 +1001,7 @@ def main():
             min_fit_clients=args.num_clients,  # 최소 N개 필요
             min_available_clients=args.num_clients,  # 최소 N개 연결 필요
         )
-        result_file = f"results_{args.strategy}_{args.dataset}_{args.num_clients}clients_{timestamp}.json"
+        result_file = f"logs/results_{args.strategy}_{args.dataset}_{args.num_clients}clients_{timestamp}.json"
     elif args.strategy == 'fedavg_bwa':
         strategy = FedAvgBWAStrategy(
             num_clients=args.num_clients,
@@ -1008,7 +1012,7 @@ def main():
             min_fit_clients=args.num_clients,  # 최소 N개 필요
             min_available_clients=args.num_clients,  # 최소 N개 연결 필요
         )
-        result_file = f"results_{args.strategy}_{args.dataset}_{args.num_clients}clients_{timestamp}.json"
+        result_file = f"logs/results_{args.strategy}_{args.dataset}_{args.num_clients}clients_{timestamp}.json"
     else:
         strategy = FedAvgBaselineStrategy(
             num_clients=args.num_clients,
@@ -1018,7 +1022,7 @@ def main():
             min_fit_clients=args.num_clients,  # 최소 N개 필요
             min_available_clients=args.num_clients,  # 최소 N개 연결 필요
         )
-        result_file = f"results_{args.strategy}_{args.dataset}_{args.num_clients}clients_{timestamp}.json"
+        result_file = f"logs/results_{args.strategy}_{args.dataset}_{args.num_clients}clients_{timestamp}.json"
 
     # Start server (Flower 0.18.0 API)
     # Increase timeout to wait for all clients
